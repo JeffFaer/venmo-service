@@ -22,3 +22,6 @@ dist/
 
 # Moneydance
 priv_key
+
+# Maven
+target/
