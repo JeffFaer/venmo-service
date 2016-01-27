@@ -16,4 +16,16 @@ public class APIException extends Exception {
   public int getCode() {
     return code;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    builder.append(getClass().getName());
+    builder.append(" [code=");
+    builder.append(code);
+    builder.append(", getMessage()=");
+    builder.append(getMessage());
+    builder.append("]");
+    return builder.toString();
+  }
 }

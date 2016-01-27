@@ -8,16 +8,20 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import javax.ws.rs.core.MultivaluedMap;
 
 import org.glassfish.jersey.uri.UriComponent;
 
 import com.sun.net.httpserver.HttpServer;
 
 public class Auth implements Closeable {
+  private static final String ACCESS_TOKEN = "access_token";
+  private static final String ERROR = "error";
+
   private static final String CLIENT_ID = "3472";
   private static final InetSocketAddress REDIRECT_ADDRESS =
       new InetSocketAddress("localhost", 54321);
@@ -53,10 +57,11 @@ public class Auth implements Closeable {
           if (server == null) {
             server = HttpServer.create(REDIRECT_ADDRESS, -1);
             server.createContext("/", ex -> {
-              Optional<String> token = getAuthToken(ex.getRequestURI());
+              MultivaluedMap<String, String> query =
+                  UriComponent.decodeQuery(ex.getRequestURI(), true);
 
               try {
-                if (token.isPresent()) {
+                if (query.containsKey(ACCESS_TOKEN) || query.containsKey(ERROR)) {
                   byte[] response = Files.readAllBytes(AUTH_RESPONSE);
                   ex.sendResponseHeaders(200, response.length);
                   ex.getResponseBody().write(response);
@@ -66,7 +71,11 @@ public class Auth implements Closeable {
 
                 ex.close();
               } finally {
-                token.ifPresent(f::complete);
+                if (query.containsKey(ACCESS_TOKEN)) {
+                  f.complete(query.getFirst(ACCESS_TOKEN));
+                } else if (query.containsKey(ERROR)) {
+                  f.completeExceptionally(new Exception(query.getFirst(ERROR)));
+                }
               }
             });
             server.start();
@@ -94,10 +103,6 @@ public class Auth implements Closeable {
     });
 
     return f;
-  }
-
-  private Optional<String> getAuthToken(URI request) {
-    return Optional.ofNullable(UriComponent.decodeQuery(request, true).getFirst("access_token"));
   }
 
   @Override

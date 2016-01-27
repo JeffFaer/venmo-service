@@ -20,4 +20,21 @@ public class VenmoResponse<T> {
   public Optional<APIException> getException() {
     return exception;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    builder.append(getClass().getName());
+    builder.append(" [");
+    if (data.isPresent()) {
+      builder.append(" data=");
+      builder.append(data.get());
+    }
+    if (exception.isPresent()) {
+      builder.append(" exception=");
+      builder.append(exception.get());
+    }
+    builder.append("]");
+    return builder.toString();
+  }
 }
