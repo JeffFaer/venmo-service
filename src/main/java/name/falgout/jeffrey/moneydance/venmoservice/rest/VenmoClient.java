@@ -11,15 +11,19 @@ import javax.ws.rs.core.GenericType;
 import name.falgout.jeffrey.moneydance.venmoservice.jersey.VenmoObjectMapperProvider;
 
 public class VenmoClient {
-  public static final String ACCESS_TOKEN = "access_token";
-  public static final String ERROR = "error";
+  static final String ACCESS_TOKEN = "access_token";
+  static final String ERROR = "error";
 
   private final Client client;
   private final WebTarget api;
 
   public VenmoClient() {
+    this("https://api.venmo.com/v1");
+  }
+
+  VenmoClient(String baseUri) {
     client = ClientBuilder.newBuilder().register(VenmoObjectMapperProvider.class).build();
-    api = client.target("https://api.venmo.com/v1");
+    api = client.target(baseUri);
   }
 
   private CompletionStage<WebTarget> authorize(WebTarget target,

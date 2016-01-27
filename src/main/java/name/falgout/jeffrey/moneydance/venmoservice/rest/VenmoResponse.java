@@ -6,18 +6,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class VenmoResponse<T> {
   private final Optional<T> data;
-  private final Optional<APIException> exception;
+  private final Optional<VenmoException> exception;
 
-  VenmoResponse(@JsonProperty("data") T data, @JsonProperty("error") APIException error) {
+  VenmoResponse(@JsonProperty("data") T data, @JsonProperty("error") VenmoException error) {
     this.data = Optional.ofNullable(data);
     exception = Optional.ofNullable(error);
   }
 
-  public T getData() throws APIException {
+  public T getData() throws VenmoException {
     return data.orElseThrow(exception::get);
   }
 
-  public Optional<APIException> getException() {
+  public Optional<VenmoException> getException() {
     return exception;
   }
 
