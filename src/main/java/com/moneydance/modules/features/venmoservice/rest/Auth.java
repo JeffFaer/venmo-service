@@ -1,5 +1,8 @@
 package com.moneydance.modules.features.venmoservice.rest;
 
+import static com.moneydance.modules.features.venmoservice.rest.VenmoClient.ACCESS_TOKEN;
+import static com.moneydance.modules.features.venmoservice.rest.VenmoClient.ERROR;
+
 import java.awt.Desktop;
 import java.io.Closeable;
 import java.net.InetSocketAddress;
@@ -19,9 +22,6 @@ import org.glassfish.jersey.uri.UriComponent;
 import com.sun.net.httpserver.HttpServer;
 
 public class Auth implements Closeable {
-  private static final String ACCESS_TOKEN = "access_token";
-  private static final String ERROR = "error";
-
   private static final String CLIENT_ID = "3472";
   private static final InetSocketAddress REDIRECT_ADDRESS =
       new InetSocketAddress("localhost", 54321);

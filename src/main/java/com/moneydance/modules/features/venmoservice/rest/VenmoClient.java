@@ -7,11 +7,13 @@ import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.Response;
 
 import com.moneydance.modules.features.venmoservice.jersey.VenmoObjectMapperProvider;
 
 public class VenmoClient {
+  public static final String ACCESS_TOKEN = "access_token";
+  public static final String ERROR = "error";
+
   private final Client client;
   private final WebTarget api;
 
@@ -20,14 +22,14 @@ public class VenmoClient {
     api = client.target("https://api.venmo.com/v1");
   }
 
-  private Response get(WebTarget target) {
-    return target.request().get();
+  private CompletionStage<WebTarget> authorize(WebTarget target,
+      CompletionStage<String> authToken) {
+    return authToken.thenApply(token -> target.queryParam(ACCESS_TOKEN, token));
   }
 
   public Future<VenmoResponse<Me>> me(CompletionStage<String> authToken) {
-    return authToken.thenApply(token -> api.path("me").queryParam("access_token", token))
-        .thenApply(this::get)
-        .thenApply(r -> r.readEntity(new GenericType<VenmoResponse<Me>>() {}))
+    return authorize(api.path("me"), authToken)
+        .thenApply(t -> t.request().get().readEntity(new GenericType<VenmoResponse<Me>>() {}))
         .toCompletableFuture();
   }
 }
