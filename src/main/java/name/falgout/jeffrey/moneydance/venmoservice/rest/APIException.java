@@ -1,4 +1,4 @@
-package com.moneydance.modules.features.venmoservice.rest;
+package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

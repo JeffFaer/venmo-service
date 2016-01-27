@@ -1,4 +1,4 @@
-package com.moneydance.modules.features.venmoservice.jackson;
+package name.falgout.jeffrey.moneydance.venmoservice.jackson;
 
 import java.io.IOException;
 import java.time.LocalDateTime;

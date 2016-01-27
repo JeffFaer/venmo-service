@@ -1,4 +1,4 @@
-package com.moneydance.modules.features.venmoservice.rest;
+package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
@@ -8,7 +8,7 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.GenericType;
 
-import com.moneydance.modules.features.venmoservice.jersey.VenmoObjectMapperProvider;
+import name.falgout.jeffrey.moneydance.venmoservice.jersey.VenmoObjectMapperProvider;
 
 public class VenmoClient {
   public static final String ACCESS_TOKEN = "access_token";

@@ -1,4 +1,4 @@
-package com.moneydance.modules.features.venmoservice.rest;
+package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

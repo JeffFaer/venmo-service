@@ -1,9 +1,10 @@
-package com.moneydance.modules.features.venmoservice.jersey;
+package name.falgout.jeffrey.moneydance.venmoservice.jersey;
 
 import javax.ws.rs.ext.ContextResolver;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.moneydance.modules.features.venmoservice.jackson.VenmoModule;
+
+import name.falgout.jeffrey.moneydance.venmoservice.jackson.VenmoModule;
 
 public class VenmoObjectMapperProvider implements ContextResolver<ObjectMapper> {
   private final ObjectMapper mapper;

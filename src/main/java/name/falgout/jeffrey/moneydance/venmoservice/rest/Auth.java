@@ -1,7 +1,7 @@
-package com.moneydance.modules.features.venmoservice.rest;
+package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
-import static com.moneydance.modules.features.venmoservice.rest.VenmoClient.ACCESS_TOKEN;
-import static com.moneydance.modules.features.venmoservice.rest.VenmoClient.ERROR;
+import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ACCESS_TOKEN;
+import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ERROR;
 
 import java.awt.Desktop;
 import java.io.Closeable;
