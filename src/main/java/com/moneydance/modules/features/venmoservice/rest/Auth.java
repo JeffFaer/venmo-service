@@ -85,9 +85,8 @@ public class Auth implements Closeable {
       lock.lock();
       try {
         numAuthorizations--;
-        if (numAuthorizations == 0 && server != null) {
-          server.stop(0);
-          server = null;
+        if (numAuthorizations == 0) {
+          close();
         }
       } finally {
         lock.unlock();
@@ -105,8 +104,10 @@ public class Auth implements Closeable {
   public void close() {
     lock.lock();
     try {
-      server.stop(0);
-      server = null;
+      if (server != null) {
+        server.stop(0);
+        server = null;
+      }
     } finally {
       lock.unlock();
     }
