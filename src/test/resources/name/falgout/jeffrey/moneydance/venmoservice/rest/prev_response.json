@@ -1,0 +1,7 @@
+{
+  "pagination": {
+    "previous": null,
+    "next": "http://localhost:12345/"
+  },
+  "data": "prev data"
+}

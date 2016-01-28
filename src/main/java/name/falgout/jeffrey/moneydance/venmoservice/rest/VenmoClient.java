@@ -2,6 +2,7 @@ package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import java.net.URI;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
@@ -33,7 +34,64 @@ public class VenmoClient {
     api = client.target(baseUri);
   }
 
-  public CompletableFuture<Response> get(CompletionStage<String> authToken, URI uri) {
+  public Future<VenmoResponse<Me>> getMe(CompletionStage<String> authToken) {
+    return get(authToken, "me")
+        .thenApply(t -> t.request().get().readEntity(new GenericType<VenmoResponse<Me>>() {}));
+  }
+
+  public Future<VenmoResponse<List<Payment>>> getPayments(CompletionStage<String> authToken) {
+    return get(authToken, "payments").thenApply(
+        t -> t.request().get().readEntity(new GenericType<VenmoResponse<List<Payment>>>() {}));
+  }
+
+  CompletableFuture<WebTarget> get(CompletionStage<String> authToken, String path) {
+    return authToken.thenApply(token -> api.path(path).queryParam(ACCESS_TOKEN, token))
+        .toCompletableFuture();
+  }
+
+  public <T> Future<VenmoResponse<T>> getNext(CompletionStage<String> authToken,
+      VenmoResponse<T> response) {
+    if (response.getException().isPresent()) {
+      CompletableFuture<VenmoResponse<T>> fail = new CompletableFuture<>();
+      fail.completeExceptionally(response.getException().get());
+      return fail;
+    } else if (!response.hasNext()) {
+      CompletableFuture<VenmoResponse<T>> fail = new CompletableFuture<>();
+      fail.completeExceptionally(new NoSuchElementException("next"));
+      return fail;
+    }
+
+    try {
+      GenericType<VenmoResponse<T>> type = response.getGenericType();
+      return get(authToken, response.getPagination().flatMap(Pagination::getNext).get())
+          .thenApply(r -> r.readEntity(type));
+    } catch (VenmoException e) {
+      throw new Error("We already checked for the VenmoException", e);
+    }
+  }
+
+  public <T> Future<VenmoResponse<T>> getPrevious(CompletionStage<String> authToken,
+      VenmoResponse<T> response) {
+    if (response.getException().isPresent()) {
+      CompletableFuture<VenmoResponse<T>> fail = new CompletableFuture<>();
+      fail.completeExceptionally(response.getException().get());
+      return fail;
+    } else if (!response.hasPrevious()) {
+      CompletableFuture<VenmoResponse<T>> fail = new CompletableFuture<>();
+      fail.completeExceptionally(new NoSuchElementException("previous"));
+      return fail;
+    }
+
+    try {
+      GenericType<VenmoResponse<T>> type = response.getGenericType();
+      return get(authToken, response.getPagination().flatMap(Pagination::getPrevious).get())
+          .thenApply(r -> r.readEntity(type));
+    } catch (VenmoException e) {
+      throw new Error("We already checked for the VenmoException", e);
+    }
+  }
+
+  private CompletableFuture<Response> get(CompletionStage<String> authToken, URI uri) {
     URI relative = api.getUri().relativize(uri);
     CompletableFuture<WebTarget> target = get(authToken, relative.getPath());
     return target.thenApply(t -> {
@@ -44,20 +102,5 @@ public class VenmoClient {
 
       return t;
     }).thenApply(t -> t.request().get());
-  }
-
-  private CompletableFuture<WebTarget> get(CompletionStage<String> authToken, String path) {
-    return authToken.thenApply(token -> api.path(path).queryParam(ACCESS_TOKEN, token))
-        .toCompletableFuture();
-  }
-
-  public Future<VenmoResponse<Me>> getMe(CompletionStage<String> authToken) {
-    return get(authToken, "me")
-        .thenApply(t -> t.request().get().readEntity(new GenericType<VenmoResponse<Me>>() {}));
-  }
-
-  public Future<VenmoResponse<List<Payment>>> getPayments(CompletionStage<String> authToken) {
-    return get(authToken, "payments").thenApply(
-        t -> t.request().get().readEntity(new GenericType<VenmoResponse<List<Payment>>>() {}));
   }
 }

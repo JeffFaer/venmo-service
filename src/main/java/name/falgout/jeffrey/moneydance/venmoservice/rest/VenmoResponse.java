@@ -2,7 +2,11 @@ package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import java.util.Optional;
 
+import javax.ws.rs.core.GenericType;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.reflect.TypeParameter;
+import com.google.common.reflect.TypeToken;
 
 public class VenmoResponse<T> {
   private final Optional<T> data;
@@ -24,8 +28,71 @@ public class VenmoResponse<T> {
     return pagination;
   }
 
+  public boolean hasNext() {
+    return pagination.flatMap(Pagination::getNext).isPresent();
+  }
+
+  public boolean hasPrevious() {
+    return pagination.flatMap(Pagination::getPrevious).isPresent();
+  }
+
   public Optional<VenmoException> getException() {
     return exception;
+  }
+
+  GenericType<VenmoResponse<T>> getGenericType() throws VenmoException {
+    @SuppressWarnings("unchecked") TypeToken<VenmoResponse<T>> type =
+        new TypeToken<VenmoResponse<T>>() {
+          private static final long serialVersionUID = -6858761506442192772L;
+        }.where(new TypeParameter<T>() {}, (Class<T>) getData().getClass());
+
+    return new GenericType<>(type.getType());
+  }
+
+  @Override
+  public int hashCode() {
+    final int prime = 31;
+    int result = 1;
+    result = prime * result + ((data == null) ? 0 : data.hashCode());
+    result = prime * result + ((exception == null) ? 0 : exception.hashCode());
+    result = prime * result + ((pagination == null) ? 0 : pagination.hashCode());
+    return result;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null) {
+      return false;
+    }
+    if (!(obj instanceof VenmoResponse)) {
+      return false;
+    }
+    VenmoResponse<?> other = (VenmoResponse<?>) obj;
+    if (data == null) {
+      if (other.data != null) {
+        return false;
+      }
+    } else if (!data.equals(other.data)) {
+      return false;
+    }
+    if (exception == null) {
+      if (other.exception != null) {
+        return false;
+      }
+    } else if (!exception.equals(other.exception)) {
+      return false;
+    }
+    if (pagination == null) {
+      if (other.pagination != null) {
+        return false;
+      }
+    } else if (!pagination.equals(other.pagination)) {
+      return false;
+    }
+    return true;
   }
 
   @Override
