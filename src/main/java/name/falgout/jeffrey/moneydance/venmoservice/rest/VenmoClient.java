@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.ws.rs.client.Client;
@@ -19,6 +20,88 @@ import org.glassfish.jersey.uri.UriComponent;
 import name.falgout.jeffrey.moneydance.venmoservice.jersey.VenmoObjectMapperProvider;
 
 public class VenmoClient {
+  public interface ResponseIterator<T> {
+    public boolean hasNext();
+
+    public VenmoResponse<T> getNextResponse(CompletionStage<String> authToken)
+      throws ExecutionException, InterruptedException;
+
+    default T next(CompletionStage<String> authToken)
+      throws VenmoException, ExecutionException, InterruptedException {
+      return getNextResponse(authToken).getData();
+    }
+
+    public boolean hasPrevious();
+
+    public VenmoResponse<T> getPreviousResponse(CompletionStage<String> authToken)
+      throws ExecutionException, InterruptedException;
+
+    default T previous(CompletionStage<String> authToken)
+      throws VenmoException, ExecutionException, InterruptedException {
+      return getPreviousResponse(authToken).getData();
+    }
+  }
+
+  private class ResponseIteratorImpl<T> implements ResponseIterator<T> {
+    private Future<VenmoResponse<T>> previous;
+    private Future<VenmoResponse<T>> next;
+
+    ResponseIteratorImpl(CompletionStage<String> authToken, VenmoResponse<T> next) {
+      setPrevious(authToken, next);
+      this.next = CompletableFuture.completedFuture(next);
+    }
+
+    private void setPrevious(CompletionStage<String> authToken, VenmoResponse<T> current) {
+      if (previous != null) {
+        previous.cancel(true);
+      }
+      previous = current.hasPrevious() ? getPrevious(authToken, current) : null;
+    }
+
+    private void setCurrent(CompletionStage<String> authToken, VenmoResponse<T> current) {
+      setPrevious(authToken, current);
+
+      if (next != null) {
+        next.cancel(true);
+      }
+      next = current.hasNext() ? getNext(authToken, current) : null;
+    }
+
+    @Override
+    public boolean hasNext() {
+      return next != null;
+    }
+
+    @Override
+    public VenmoResponse<T> getNextResponse(CompletionStage<String> authToken)
+      throws ExecutionException, InterruptedException {
+      if (next == null) {
+        throw new NoSuchElementException();
+      }
+
+      VenmoResponse<T> actualNext = next.get();
+      setCurrent(authToken, actualNext);
+      return actualNext;
+    }
+
+    @Override
+    public boolean hasPrevious() {
+      return previous != null;
+    }
+
+    @Override
+    public VenmoResponse<T> getPreviousResponse(CompletionStage<String> authToken)
+      throws ExecutionException, InterruptedException {
+      if (previous == null) {
+        throw new NoSuchElementException();
+      }
+
+      VenmoResponse<T> actualNext = previous.get();
+      setCurrent(authToken, actualNext);
+      return actualNext;
+    }
+  }
+
   static final String ACCESS_TOKEN = "access_token";
   static final String ERROR = "error";
 
@@ -47,6 +130,11 @@ public class VenmoClient {
   CompletableFuture<WebTarget> get(CompletionStage<String> authToken, String path) {
     return authToken.thenApply(token -> api.path(path).queryParam(ACCESS_TOKEN, token))
         .toCompletableFuture();
+  }
+
+  public <T> ResponseIterator<T> iterator(CompletionStage<String> authToken,
+      VenmoResponse<T> next) {
+    return new ResponseIteratorImpl<>(authToken, next);
   }
 
   public <T> Future<VenmoResponse<T>> getNext(CompletionStage<String> authToken,

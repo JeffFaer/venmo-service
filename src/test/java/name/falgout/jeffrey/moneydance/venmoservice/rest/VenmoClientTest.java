@@ -43,6 +43,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
+import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ResponseIterator;
+
 @RunWith(MockitoJUnitRunner.class)
 public class VenmoClientTest {
   static InetSocketAddress localAddress = new InetSocketAddress("localhost", 12345);
@@ -142,20 +144,29 @@ public class VenmoClientTest {
     assertEquals(2, payments.size());
   }
 
-  @Test
-  public void paginationTest() throws IOException, InterruptedException, ExecutionException,
-    URISyntaxException, VenmoException {
-    HttpHandler prevHandler = mock(HttpHandler.class);
-    HttpHandler nextHandler = mock(HttpHandler.class);
+  private void setupPagination(HttpHandler prevHandler, HttpHandler nextHandler)
+    throws IOException, URISyntaxException {
     doAnswer(resource("pagination_response.json")).when(handler).handle(any());
     doAnswer(resource("prev_response.json")).when(prevHandler).handle(any());
     doAnswer(resource("next_response.json")).when(nextHandler).handle(any());
     server.createContext("/", handler);
     server.createContext("/previous", prevHandler);
     server.createContext("/next", nextHandler);
+  }
 
-    Future<VenmoResponse<String>> future = client.get(token, "")
+  private Future<VenmoResponse<String>> getPaginationInitial() {
+    return client.get(token, "")
         .thenApply(t -> t.request().get().readEntity(new GenericType<VenmoResponse<String>>() {}));
+  }
+
+  @Test
+  public void paginationTest() throws IOException, InterruptedException, ExecutionException,
+    URISyntaxException, VenmoException {
+    HttpHandler prevHandler = mock(HttpHandler.class);
+    HttpHandler nextHandler = mock(HttpHandler.class);
+    setupPagination(prevHandler, nextHandler);
+
+    Future<VenmoResponse<String>> future = getPaginationInitial();
     VenmoResponse<String> current = future.get();
     assertEquals("current data", current.getData());
     assertTrue(current.hasNext());
@@ -198,5 +209,35 @@ public class VenmoClientTest {
     query = UriComponent.decodeQuery(fromNext.getRequestURI(), true);
     assertTrue(query.containsKey("from"));
     assertEquals("next", query.getFirst("from"));
+  }
+
+  @Test
+  public void responseIteratorTest() throws IOException, URISyntaxException, VenmoException,
+    ExecutionException, InterruptedException {
+    HttpHandler prevHandler = mock(HttpHandler.class);
+    HttpHandler nextHandler = mock(HttpHandler.class);
+    setupPagination(prevHandler, nextHandler);
+
+    ResponseIterator<String> itr = client.iterator(token, getPaginationInitial().get());
+    assertTrue(itr.hasPrevious());
+    assertTrue(itr.hasNext());
+
+    String current = itr.next(token);
+    assertEquals("current data", current);
+    assertTrue(itr.hasPrevious());
+    assertTrue(itr.hasNext());
+
+    String next = itr.next(token);
+    assertEquals("next data", next);
+    assertTrue(itr.hasPrevious());
+    assertFalse(itr.hasNext());
+
+    String current2 = itr.previous(token);
+    assertEquals(current, current2);
+
+    String previous = itr.previous(token);
+    assertEquals("prev data", previous);
+    assertFalse(itr.hasPrevious());
+    assertTrue(itr.hasNext());
   }
 }
