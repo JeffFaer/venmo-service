@@ -113,11 +113,13 @@ public class VenmoClientTest {
   }
 
   @Test
-  public void paymentsTest() throws IOException, InterruptedException, ExecutionException {
+  public void paymentsTest()
+    throws IOException, InterruptedException, ExecutionException, VenmoException {
     doAnswer(resource("payments_response.json")).when(handler).handle(any());
     server.createContext("/payments", handler);
 
     VenmoResponse<List<Payment>> req = client.getPayments(token).get();
-    System.out.println(req);
+    List<Payment> payments = req.getData();
+    assertEquals(2, payments.size());
   }
 }

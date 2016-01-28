@@ -60,5 +60,4 @@ public class VenmoClient {
     return get(authToken, "payments").thenApply(
         t -> t.request().get().readEntity(new GenericType<VenmoResponse<List<Payment>>>() {}));
   }
-
 }
