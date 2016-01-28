@@ -3,9 +3,7 @@ package name.falgout.jeffrey.moneydance.venmoservice.rest;
 import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ACCESS_TOKEN;
 import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ERROR;
 
-import java.awt.Desktop;
 import java.io.Closeable;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -37,22 +35,32 @@ public class Auth implements Closeable {
   }
 
   private final URI authUri;
+  private final URIBrowser browser;
 
   private final Lock lock = new ReentrantLock();
   private HttpServer server;
   private int numAuthorizations = 0;
 
   public Auth() {
-    this("https://api.venmo.com/v1/oauth/authorize");
+    this(URIBrowser.DESKTOP_BROWSER);
+  }
+
+  public Auth(URIBrowser browser) {
+    this("https://api.venmo.com/v1/oauth/authorize", browser);
   }
 
   Auth(String baseUri) {
+    this(baseUri, URIBrowser.DESKTOP_BROWSER);
+  }
+
+  Auth(String baseUri, URIBrowser browser) {
     authUri =
         UriBuilder.fromUri(baseUri)
             .queryParam("client_id", CLIENT_ID)
             .queryParam("scope",
                 String.join(" ", "access_profile", "access_balance", "access_payment_history"))
             .build();
+    this.browser = browser;
   }
 
   CompletableFuture<String> captureAuthorization() {
@@ -107,21 +115,14 @@ public class Auth implements Closeable {
   }
 
   public CompletableFuture<String> authorize() {
-    Desktop d = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
-    if (d == null || !d.isSupported(Desktop.Action.BROWSE)) {
-      CompletableFuture<String> ex = new CompletableFuture<>();
-      ex.completeExceptionally(new UnsupportedOperationException("Cannot open " + authUri));
-      return ex;
-    } else {
-      CompletableFuture<String> auth = captureAuthorization();
-      try {
-        d.browse(authUri);
-      } catch (IOException e) {
-        auth.completeExceptionally(e);
-      }
-
-      return auth;
+    CompletableFuture<String> auth = captureAuthorization();
+    try {
+      browser.browse(authUri);
+    } catch (Throwable t) {
+      auth.completeExceptionally(t);
     }
+
+    return auth;
   }
 
   @Override
