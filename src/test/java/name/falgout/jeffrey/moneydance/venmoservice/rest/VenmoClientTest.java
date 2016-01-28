@@ -43,8 +43,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
-import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ResponseIterator;
-
 @RunWith(MockitoJUnitRunner.class)
 public class VenmoClientTest {
   static InetSocketAddress localAddress = new InetSocketAddress("localhost", 12345);
@@ -217,7 +215,7 @@ public class VenmoClientTest {
     HttpHandler nextHandler = mock(HttpHandler.class);
     setupPagination(prevHandler, nextHandler);
 
-    ResponseIterator<Integer> itr = client.iterator(token, getPaginationInitial().get());
+    PageIterator<Integer> itr = client.iterator(token, getPaginationInitial().get());
     assertTrue(itr.hasPrevious());
     assertTrue(itr.hasNext());
 

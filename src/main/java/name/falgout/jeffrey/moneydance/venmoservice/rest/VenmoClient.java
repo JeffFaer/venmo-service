@@ -27,33 +27,11 @@ import com.google.common.reflect.TypeToken;
 import name.falgout.jeffrey.moneydance.venmoservice.jersey.VenmoObjectMapperProvider;
 
 public class VenmoClient {
-  public interface ResponseIterator<T> {
-    public boolean hasNext();
-
-    public VenmoResponse<T> getNextResponse(CompletionStage<String> authToken)
-      throws ExecutionException, InterruptedException;
-
-    default T next(CompletionStage<String> authToken)
-      throws VenmoException, ExecutionException, InterruptedException {
-      return getNextResponse(authToken).getData();
-    }
-
-    public boolean hasPrevious();
-
-    public VenmoResponse<T> getPreviousResponse(CompletionStage<String> authToken)
-      throws ExecutionException, InterruptedException;
-
-    default T previous(CompletionStage<String> authToken)
-      throws VenmoException, ExecutionException, InterruptedException {
-      return getPreviousResponse(authToken).getData();
-    }
-  }
-
-  private class ResponseIteratorImpl<T> implements ResponseIterator<T> {
+  private class PageIteratorImpl<T> implements PageIterator<T> {
     private Future<VenmoResponse<T>> previous;
     private Future<VenmoResponse<T>> next;
 
-    ResponseIteratorImpl(CompletionStage<String> authToken, VenmoResponse<T> next) {
+    PageIteratorImpl(CompletionStage<String> authToken, VenmoResponse<T> next) {
       setPrevious(authToken, next);
       this.next = CompletableFuture.completedFuture(next);
     }
@@ -103,9 +81,9 @@ public class VenmoClient {
         throw new NoSuchElementException();
       }
 
-      VenmoResponse<T> actualNext = previous.get();
-      setCurrent(authToken, actualNext);
-      return actualNext;
+      VenmoResponse<T> actualPrevious = previous.get();
+      setCurrent(authToken, actualPrevious);
+      return actualPrevious;
     }
   }
 
@@ -212,9 +190,8 @@ public class VenmoClient {
     });
   }
 
-  public <T> ResponseIterator<T> iterator(CompletionStage<String> authToken,
-      VenmoResponse<T> next) {
-    return new ResponseIteratorImpl<>(authToken, next);
+  public <T> PageIterator<T> iterator(CompletionStage<String> authToken, VenmoResponse<T> next) {
+    return new PageIteratorImpl<>(authToken, next);
   }
 
   public <T> Future<VenmoResponse<T>> getNext(CompletionStage<String> authToken,
