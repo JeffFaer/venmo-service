@@ -2,16 +2,15 @@ package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import java.util.Optional;
 
-import javax.ws.rs.core.GenericType;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.reflect.TypeParameter;
 import com.google.common.reflect.TypeToken;
 
 public class VenmoResponse<T> {
   private final Optional<T> data;
   private final Optional<Pagination> pagination;
   private final Optional<VenmoException> exception;
+
+  private TypeToken<T> dataType;
 
   VenmoResponse(@JsonProperty("data") T data, @JsonProperty("pagination") Pagination pagination,
       @JsonProperty("error") VenmoException error) {
@@ -40,13 +39,12 @@ public class VenmoResponse<T> {
     return exception;
   }
 
-  GenericType<VenmoResponse<T>> getGenericType() throws VenmoException {
-    @SuppressWarnings("unchecked") TypeToken<VenmoResponse<T>> type =
-        new TypeToken<VenmoResponse<T>>() {
-          private static final long serialVersionUID = -6858761506442192772L;
-        }.where(new TypeParameter<T>() {}, (Class<T>) getData().getClass());
+  TypeToken<T> getDataType() {
+    return dataType;
+  }
 
-    return new GenericType<>(type.getType());
+  void setDataType(TypeToken<T> dataType) {
+    this.dataType = dataType;
   }
 
   @Override

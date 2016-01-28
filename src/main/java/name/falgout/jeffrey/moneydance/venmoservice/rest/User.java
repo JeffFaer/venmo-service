@@ -1,6 +1,6 @@
 package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -8,10 +8,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 class User {
   private final String name;
-  private final LocalDateTime dateJoined;
+  private final ZonedDateTime dateJoined;
 
   User(@JsonProperty("display_name") String name,
-      @JsonProperty("date_joined") LocalDateTime dateJoined) {
+      @JsonProperty("date_joined") ZonedDateTime dateJoined) {
     this.name = name;
     this.dateJoined = dateJoined;
   }
@@ -20,7 +20,7 @@ class User {
     return name;
   }
 
-  public LocalDateTime getDateJoined() {
+  public ZonedDateTime getDateJoined() {
     return dateJoined;
   }
 }

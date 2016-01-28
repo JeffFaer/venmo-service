@@ -2,6 +2,9 @@ package name.falgout.jeffrey.moneydance.venmoservice.jackson;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 import com.fasterxml.jackson.core.JsonParser;
@@ -17,11 +20,14 @@ public class VenmoModule extends SimpleModule {
   private static final long serialVersionUID = 2046605587084383357L;
 
   public VenmoModule() {
-    addDeserializer(LocalDateTime.class, new JsonDeserializer<LocalDateTime>() {
+    addDeserializer(ZonedDateTime.class, new JsonDeserializer<ZonedDateTime>() {
       @Override
-      public LocalDateTime deserialize(JsonParser p, DeserializationContext ctxt)
+      public ZonedDateTime deserialize(JsonParser p, DeserializationContext ctxt)
         throws IOException, JsonProcessingException {
-        return LocalDateTime.parse(p.getValueAsString(), DateTimeFormatter.ISO_DATE_TIME);
+        return ZonedDateTime
+            .of(LocalDateTime.parse(p.getValueAsString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                ZoneOffset.UTC)
+            .withZoneSameInstant(ZoneId.systemDefault());
       }
     });
 

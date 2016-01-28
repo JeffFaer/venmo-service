@@ -1,7 +1,7 @@
 package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -23,21 +23,21 @@ public class Payment {
   }
 
   public enum Status {
-    SETTLED, PENDING, FAILED, EXPIRED;
+    SETTLED, PENDING, CANCELLED, FAILED, EXPIRED;
   }
 
   private final Status status;
   private final Target target;
   private final User actor;
   private final BigDecimal amount;
-  private final LocalDateTime dateCreated;
-  private final LocalDateTime dateCompleted;
+  private final ZonedDateTime dateCreated;
+  private final ZonedDateTime dateCompleted;
   private final String note;
 
   Payment(@JsonProperty("status") Status status, @JsonProperty("target") Target target,
       @JsonProperty("actor") User actor, @JsonProperty("amount") BigDecimal amount,
-      @JsonProperty("date_created") LocalDateTime dateCreated,
-      @JsonProperty("date_completed") LocalDateTime dateCompleted,
+      @JsonProperty("date_created") ZonedDateTime dateCreated,
+      @JsonProperty("date_completed") ZonedDateTime dateCompleted,
       @JsonProperty("note") String note) {
     this.status = status;
     this.target = target;
@@ -56,11 +56,11 @@ public class Payment {
     return amount;
   }
 
-  public LocalDateTime getDateCreated() {
+  public ZonedDateTime getDateCreated() {
     return dateCreated;
   }
 
-  public LocalDateTime getDateCompleted() {
+  public ZonedDateTime getDateCompleted() {
     return dateCompleted;
   }
 

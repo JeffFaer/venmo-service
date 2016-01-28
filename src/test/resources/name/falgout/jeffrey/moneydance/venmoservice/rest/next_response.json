@@ -3,5 +3,5 @@
     "previous": "http://localhost:12345/?from=next",
     "next": null
   },
-  "data": "next data"
+  "data": 3
 }

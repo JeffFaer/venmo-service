@@ -19,13 +19,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.glassfish.jersey.uri.UriComponent;
@@ -96,7 +96,7 @@ public class VenmoClientTest {
     assertEquals(new BigDecimal("102.3"), me.getBalance());
     assertEquals("Cody De La Vara", me.getName());
     assertEquals(LocalDateTime.parse("2013-02-10T21:58:05", DateTimeFormatter.ISO_DATE_TIME),
-        me.getDateJoined());
+        me.getDateJoined().withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime());
 
     verify(handler).handle(exchangeCaptor.capture());
     HttpExchange ex = exchangeCaptor.getValue();
@@ -154,9 +154,8 @@ public class VenmoClientTest {
     server.createContext("/next", nextHandler);
   }
 
-  private Future<VenmoResponse<String>> getPaginationInitial() {
-    return client.get(token, "")
-        .thenApply(t -> t.request().get().readEntity(new GenericType<VenmoResponse<String>>() {}));
+  private Future<VenmoResponse<Integer>> getPaginationInitial() {
+    return client.target(token, "").thenApply(t -> client.getData(t, Integer.class));
   }
 
   @Test
@@ -166,22 +165,22 @@ public class VenmoClientTest {
     HttpHandler nextHandler = mock(HttpHandler.class);
     setupPagination(prevHandler, nextHandler);
 
-    Future<VenmoResponse<String>> future = getPaginationInitial();
-    VenmoResponse<String> current = future.get();
-    assertEquals("current data", current.getData());
+    Future<VenmoResponse<Integer>> future = getPaginationInitial();
+    VenmoResponse<Integer> current = future.get();
+    assertEquals(2, (int) current.getData());
     assertTrue(current.hasNext());
     assertTrue(current.hasPrevious());
 
-    VenmoResponse<String> next = client.getNext(token, current).get();
-    assertEquals("next data", next.getData());
+    VenmoResponse<Integer> next = client.getNext(token, current).get();
+    assertEquals(3, (int) next.getData());
     assertFalse(next.hasNext());
     assertTrue(next.hasPrevious());
 
-    VenmoResponse<String> current2 = client.getPrevious(token, next).get();
+    VenmoResponse<Integer> current2 = client.getPrevious(token, next).get();
     assertEquals(current, current2);
 
-    VenmoResponse<String> previous = client.getPrevious(token, current).get();
-    assertEquals("prev data", previous.getData());
+    VenmoResponse<Integer> previous = client.getPrevious(token, current).get();
+    assertEquals(1, (int) previous.getData());
     assertFalse(previous.hasPrevious());
     assertTrue(previous.hasNext());
 
@@ -218,25 +217,25 @@ public class VenmoClientTest {
     HttpHandler nextHandler = mock(HttpHandler.class);
     setupPagination(prevHandler, nextHandler);
 
-    ResponseIterator<String> itr = client.iterator(token, getPaginationInitial().get());
+    ResponseIterator<Integer> itr = client.iterator(token, getPaginationInitial().get());
     assertTrue(itr.hasPrevious());
     assertTrue(itr.hasNext());
 
-    String current = itr.next(token);
-    assertEquals("current data", current);
+    int current = itr.next(token);
+    assertEquals(2, current);
     assertTrue(itr.hasPrevious());
     assertTrue(itr.hasNext());
 
-    String next = itr.next(token);
-    assertEquals("next data", next);
+    int next = itr.next(token);
+    assertEquals(3, next);
     assertTrue(itr.hasPrevious());
     assertFalse(itr.hasNext());
 
-    String current2 = itr.previous(token);
+    int current2 = itr.previous(token);
     assertEquals(current, current2);
 
-    String previous = itr.previous(token);
-    assertEquals("prev data", previous);
+    int previous = itr.previous(token);
+    assertEquals(1, previous);
     assertFalse(itr.hasPrevious());
     assertTrue(itr.hasNext());
   }

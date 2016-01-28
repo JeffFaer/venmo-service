@@ -1,7 +1,7 @@
 package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -24,7 +24,7 @@ public class Me {
     return user.getName();
   }
 
-  public LocalDateTime getDateJoined() {
+  public ZonedDateTime getDateJoined() {
     return user.getDateJoined();
   }
 
