@@ -229,7 +229,7 @@ public class VenmoClient {
 
   private CompletableFuture<WebTarget> targetRelative(CompletionStage<String> authToken, URI uri) {
     URI relative = api.getUri().relativize(uri);
-    if (relative == uri) {
+    if (relative.isAbsolute()) {
       // We couldn't relativize the URIs. We won't be able to access it with our (WebTarget api).
       throw new IllegalArgumentException("Could not relativize " + uri);
     }
