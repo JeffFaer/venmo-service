@@ -8,26 +8,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Me {
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  static class User {
-    private final String name;
-    private final LocalDateTime dateJoined;
-
-    User(@JsonProperty("display_name") String name,
-        @JsonProperty("date_joined") LocalDateTime dateJoined) {
-      this.name = name;
-      this.dateJoined = dateJoined;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public LocalDateTime getDateJoined() {
-      return dateJoined;
-    }
-  }
-
   private final BigDecimal balance;
   private final User user;
 

@@ -6,15 +6,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class VenmoResponse<T> {
   private final Optional<T> data;
+  private final Optional<Pagination> pagination;
   private final Optional<VenmoException> exception;
 
-  VenmoResponse(@JsonProperty("data") T data, @JsonProperty("error") VenmoException error) {
+  VenmoResponse(@JsonProperty("data") T data, @JsonProperty("pagination") Pagination pagination,
+      @JsonProperty("error") VenmoException error) {
     this.data = Optional.ofNullable(data);
+    this.pagination = Optional.ofNullable(pagination);
     exception = Optional.ofNullable(error);
   }
 
   public T getData() throws VenmoException {
     return data.orElseThrow(exception::get);
+  }
+
+  public Optional<Pagination> getPagination() {
+    return pagination;
   }
 
   public Optional<VenmoException> getException() {
@@ -29,6 +36,10 @@ public class VenmoResponse<T> {
     if (data.isPresent()) {
       builder.append(" data=");
       builder.append(data.get());
+      if (pagination.isPresent()) {
+        builder.append(", pagination=");
+        builder.append(pagination.get());
+      }
     }
     if (exception.isPresent()) {
       builder.append(" exception=");

@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -78,7 +79,7 @@ public class VenmoClientTest {
     doAnswer(resource("me_response.json")).when(handler).handle(any());
     server.createContext("/me", handler);
 
-    VenmoResponse<Me> req = client.me(token).get();
+    VenmoResponse<Me> req = client.getMe(token).get();
     Me me = req.getData();
     assertEquals(new BigDecimal("102.3"), me.getBalance());
     assertEquals("Cody De La Vara", me.getName());
@@ -98,7 +99,7 @@ public class VenmoClientTest {
     doAnswer(resource("error_response.json")).when(handler).handle(any());
     server.createContext("/me", handler);
 
-    VenmoResponse<Me> req = client.me(token).get();
+    VenmoResponse<Me> req = client.getMe(token).get();
     assertTrue(req.getException().isPresent());
     VenmoException ex = req.getException().get();
     assertEquals(261, ex.getCode());
@@ -109,5 +110,14 @@ public class VenmoClientTest {
     } catch (VenmoException e) {
       assertEquals(ex, e);
     }
+  }
+
+  @Test
+  public void paymentsTest() throws IOException, InterruptedException, ExecutionException {
+    doAnswer(resource("payments_response.json")).when(handler).handle(any());
+    server.createContext("/payments", handler);
+
+    VenmoResponse<List<Payment>> req = client.getPayments(token).get();
+    System.out.println(req);
   }
 }

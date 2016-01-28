@@ -1,5 +1,8 @@
 package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
 
@@ -7,6 +10,10 @@ import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.GenericType;
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
+
+import org.glassfish.jersey.uri.UriComponent;
 
 import name.falgout.jeffrey.moneydance.venmoservice.jersey.VenmoObjectMapperProvider;
 
@@ -26,14 +33,32 @@ public class VenmoClient {
     api = client.target(baseUri);
   }
 
-  private CompletionStage<WebTarget> authorize(WebTarget target,
-      CompletionStage<String> authToken) {
-    return authToken.thenApply(token -> target.queryParam(ACCESS_TOKEN, token));
+  public CompletableFuture<Response> get(CompletionStage<String> authToken, URI uri) {
+    URI relative = api.getUri().relativize(uri);
+    CompletableFuture<WebTarget> target = get(authToken, relative.getPath());
+    return target.thenApply(t -> {
+      MultivaluedMap<String, String> query = UriComponent.decodeQuery(uri, true);
+      for (String key : query.keySet()) {
+        t = t.queryParam(key, query.get(key).toArray());
+      }
+
+      return t;
+    }).thenApply(t -> t.request().get());
   }
 
-  public Future<VenmoResponse<Me>> me(CompletionStage<String> authToken) {
-    return authorize(api.path("me"), authToken)
-        .thenApply(t -> t.request().get().readEntity(new GenericType<VenmoResponse<Me>>() {}))
+  private CompletableFuture<WebTarget> get(CompletionStage<String> authToken, String path) {
+    return authToken.thenApply(token -> api.path(path).queryParam(ACCESS_TOKEN, token))
         .toCompletableFuture();
   }
+
+  public Future<VenmoResponse<Me>> getMe(CompletionStage<String> authToken) {
+    return get(authToken, "me")
+        .thenApply(t -> t.request().get().readEntity(new GenericType<VenmoResponse<Me>>() {}));
+  }
+
+  public Future<VenmoResponse<List<Payment>>> getPayments(CompletionStage<String> authToken) {
+    return get(authToken, "payments").thenApply(
+        t -> t.request().get().readEntity(new GenericType<VenmoResponse<List<Payment>>>() {}));
+  }
+
 }
