@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.nio.file.Files;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -89,7 +88,7 @@ public class AuthTest {
     }
 
     byte[] allRead = sink.toByteArray();
-    assertArrayEquals(Files.readAllBytes(Auth.AUTH_RESPONSE), allRead);
+    assertArrayEquals(Auth.getAuthResponse(), allRead);
   }
 
   @Test

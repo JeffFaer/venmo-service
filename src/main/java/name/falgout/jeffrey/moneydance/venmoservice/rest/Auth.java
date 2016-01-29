@@ -3,13 +3,12 @@ package name.falgout.jeffrey.moneydance.venmoservice.rest;
 import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ACCESS_TOKEN;
 import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ERROR;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -24,14 +23,17 @@ import com.sun.net.httpserver.HttpServer;
 public class Auth implements Closeable {
   private static final String CLIENT_ID = "3472";
   static final InetSocketAddress REDIRECT_ADDRESS = new InetSocketAddress("localhost", 54321);
-  static final Path AUTH_RESPONSE;
 
-  static {
-    try {
-      AUTH_RESPONSE = Paths.get(Auth.class.getResource("auth_response.html").toURI());
-    } catch (URISyntaxException e) {
-      throw new Error(e);
+  static byte[] getAuthResponse() throws IOException {
+    InputStream in = Auth.class.getResourceAsStream("auth_response.html");
+    ByteArrayOutputStream sink = new ByteArrayOutputStream();
+    byte[] buf = new byte[1024];
+    int numRead;
+    while ((numRead = in.read(buf)) > 0) {
+      sink.write(buf, 0, numRead);
     }
+
+    return sink.toByteArray();
   }
 
   private final URI authUri;
@@ -75,7 +77,7 @@ public class Auth implements Closeable {
 
           try {
             if (query.containsKey(ACCESS_TOKEN) || query.containsKey(ERROR)) {
-              byte[] response = Files.readAllBytes(AUTH_RESPONSE);
+              byte[] response = getAuthResponse();
               ex.sendResponseHeaders(200, response.length);
               ex.getResponseBody().write(response);
             } else {
