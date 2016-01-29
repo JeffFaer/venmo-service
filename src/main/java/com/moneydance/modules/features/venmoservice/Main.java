@@ -1,11 +1,13 @@
 package com.moneydance.modules.features.venmoservice;
 
 import javax.swing.JFrame;
+import javax.ws.rs.ext.RuntimeDelegate;
 
 import com.moneydance.apps.md.controller.FeatureModule;
 import com.moneydance.awt.AwtUtil;
 
 import name.falgout.jeffrey.moneydance.venmoservice.AccountSetup;
+import name.falgout.jeffrey.moneydance.venmoservice.jersey.MoneydanceRuntimeDelegate;
 
 public class Main extends FeatureModule {
   private AccountSetup setup;
@@ -21,6 +23,8 @@ public class Main extends FeatureModule {
   @Override
   public void init() {
     System.err.println("Init");
+    RuntimeDelegate.setInstance(new MoneydanceRuntimeDelegate());
+
     getContext().registerFeature(this, "setup", null, "Setup Venmo Account");
   }
 
