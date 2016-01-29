@@ -1,11 +1,20 @@
 package name.falgout.jeffrey.moneydance.venmoservice;
 
+import java.awt.Dimension;
 import java.awt.event.ItemEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -22,17 +31,26 @@ import javax.swing.SwingUtilities;
 import com.infinitekind.moneydance.model.Account;
 import com.infinitekind.moneydance.model.AccountUtil;
 import com.infinitekind.moneydance.model.AcctFilter;
+import com.infinitekind.moneydance.model.OnlineTxn;
+import com.infinitekind.moneydance.model.OnlineTxnList;
 import com.moneydance.apps.md.controller.FeatureModule;
 import com.moneydance.apps.md.controller.FeatureModuleContext;
 
 import name.falgout.jeffrey.moneydance.venmoservice.rest.Auth;
+import name.falgout.jeffrey.moneydance.venmoservice.rest.Me;
+import name.falgout.jeffrey.moneydance.venmoservice.rest.PageIterator;
+import name.falgout.jeffrey.moneydance.venmoservice.rest.Payment;
 import name.falgout.jeffrey.moneydance.venmoservice.rest.URIBrowser;
+import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient;
+import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoException;
+import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoResponse;
 
 public class AccountSetup extends JFrame {
   private static final long serialVersionUID = -3239889646842222229L;
 
   private final URIBrowser browser;
   private final Auth auth;
+  private final VenmoClient client;
 
   private final VenmoAccountState state;
 
@@ -48,6 +66,7 @@ public class AccountSetup extends JFrame {
   public AccountSetup(FeatureModule feature, FeatureModuleContext context) {
     browser = new MoneydanceBrowser(context);
     auth = new Auth(browser);
+    client = new VenmoClient();
 
     state = new VenmoAccountState(feature);
     state.load(context);
@@ -60,6 +79,7 @@ public class AccountSetup extends JFrame {
     accountLabel.setLabelFor(accountLabel);
 
     token = new JTextField();
+    token.setPreferredSize(new Dimension(200, 20));
     tokenLaunch = new JButton(new ImageIcon(feature.getIconImage()));
     tokenLaunch.setToolTipText("Open a token request in your Web browser.");
 
@@ -108,6 +128,8 @@ public class AccountSetup extends JFrame {
         } else {
           targetAccount.setSelectedItem(selected);
         }
+
+        pack();
       }
     });
 
@@ -168,6 +190,58 @@ public class AccountSetup extends JFrame {
   }
 
   private void downloadTransactions(Account account, String token) {
-    // TODO Auto-generated method stub
+    ZonedDateTime lastFetched =
+        state.getLastFetched(account).orElseGet(() -> getCreationDate(account));
+
+    CompletionStage<String> authToken = CompletableFuture.completedFuture(token);
+
+    Future<VenmoResponse<Me>> whoAmI = client.getMe(authToken);
+    Future<VenmoResponse<List<Payment>>> firstPage =
+        client.getPaymentsAfter(authToken, lastFetched);
+    // TODO SwingWorker
+    try {
+      Me me = whoAmI.get().getData();
+      String myName = me.getName();
+
+      OnlineTxnList txns = account.getDownloadedTxns();
+
+      PageIterator<List<Payment>> itr = client.iterator(authToken, firstPage.get());
+      while (itr.hasNext()) {
+        for (Payment p : itr.next(authToken)) {
+          OnlineTxn txn = txns.newTxn();
+
+          BigDecimal amount = p.getAmount();
+          if (p.getDestinationName().filter(myName::equals).isPresent()) {
+            // We're the target of the payment.
+            amount = amount.negate();
+          }
+
+          long mdAmount = amount.multiply(new BigDecimal(100)).toBigInteger().longValue();
+
+          txn.setDateInitiated(p.getDateCreated().toInstant().toEpochMilli());
+          txn.setDatePosted(p.getDateCompleted().toInstant().toEpochMilli());
+          txn.setAmount(mdAmount);
+          txn.setMemo(p.getNote());
+          txn.setFITxnId(p.getId());
+          txn.setName(p.getSourceName());
+          p.getDestinationName().ifPresent(txn::setPayeeName);
+
+          System.out.println(txn);
+          // txns.addNewTxn(txn);
+        }
+      }
+    } catch (InterruptedException | ExecutionException | VenmoException e) {
+      e.printStackTrace();
+    }
+
+    state.setLastFetched(account, ZonedDateTime.now());
+  }
+
+  private ZonedDateTime getCreationDate(Account account) {
+    long creationDate = account.getCreationDate();
+    ZonedDateTime dateTime = Instant.ofEpochMilli(creationDate).atZone(ZoneId.systemDefault());
+
+    LocalDate date = dateTime.toLocalDate();
+    return date.atStartOfDay(ZoneId.systemDefault());
   }
 }

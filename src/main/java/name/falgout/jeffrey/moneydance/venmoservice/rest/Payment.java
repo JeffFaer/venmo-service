@@ -33,12 +33,13 @@ public class Payment {
   private final ZonedDateTime dateCreated;
   private final ZonedDateTime dateCompleted;
   private final String note;
+  private final String id;
 
   Payment(@JsonProperty("status") Status status, @JsonProperty("target") Target target,
       @JsonProperty("actor") User actor, @JsonProperty("amount") BigDecimal amount,
       @JsonProperty("date_created") ZonedDateTime dateCreated,
       @JsonProperty("date_completed") ZonedDateTime dateCompleted,
-      @JsonProperty("note") String note) {
+      @JsonProperty("note") String note, @JsonProperty("id") String id) {
     this.status = status;
     this.target = target;
     this.actor = actor;
@@ -46,6 +47,7 @@ public class Payment {
     this.dateCreated = dateCreated;
     this.dateCompleted = dateCompleted;
     this.note = note;
+    this.id = id;
   }
 
   public Status getStatus() {
@@ -66,6 +68,10 @@ public class Payment {
 
   public String getNote() {
     return note;
+  }
+
+  public String getId() {
+    return id;
   }
 
   public String getSourceName() {

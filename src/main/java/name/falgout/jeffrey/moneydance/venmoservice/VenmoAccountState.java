@@ -4,7 +4,6 @@ import static java.util.stream.Collectors.toList;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -44,7 +43,7 @@ public class VenmoAccountState {
   }
 
   private static final String KEY_DELIMITER = ".";
-  private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+  private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_ZONED_DATE_TIME;
 
   private final String featureName;
   private final String accountsKey;
@@ -110,19 +109,10 @@ public class VenmoAccountState {
     String dateKey = getDateKey(account);
     SyncRecord s = context.getCurrentAccountBook().getLocalStorage();
     if (s.containsKey(dateKey)) {
-      return Optional.of(parse(s.get(dateKey)));
+      return Optional.of(ZonedDateTime.parse(s.get(dateKey), FORMATTER));
     } else {
       return Optional.empty();
     }
-  }
-
-  private ZonedDateTime parse(String s) {
-    return ZonedDateTime.of(LocalDateTime.parse(s, FORMATTER), ZoneOffset.UTC)
-        .withZoneSameInstant(ZoneId.systemDefault());
-  }
-
-  private String toString(ZonedDateTime s) {
-    return s.withZoneSameInstant(ZoneOffset.UTC).withNano(0).toLocalDateTime().format(FORMATTER);
   }
 
   public void removeFrom(SyncRecord storage) {
@@ -140,7 +130,7 @@ public class VenmoAccountState {
 
     for (Entry<Account, StateEntry> e : state.entrySet()) {
       e.getValue().getLastFetched().ifPresent(time -> {
-        r.put(getDateKey(e.getKey()), toString(time));
+        r.put(getDateKey(e.getKey()), FORMATTER.format(time));
       });
     }
 
