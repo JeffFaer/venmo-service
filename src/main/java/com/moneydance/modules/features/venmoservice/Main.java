@@ -27,7 +27,6 @@ public class Main extends FeatureModule {
   }
 
   private AccountSetup setup;
-  private JFrame frame;
 
   public Main() {}
 
@@ -49,7 +48,6 @@ public class Main extends FeatureModule {
 
   @Override
   public void init() {
-    System.err.println("Init");
     RuntimeDelegate.setInstance(new MoneydanceRuntimeDelegate());
 
     getContext().registerFeature(this, "setup", null, "Setup Venmo Account");
@@ -57,33 +55,25 @@ public class Main extends FeatureModule {
 
   @Override
   public void invoke(String uri) {
-    System.err.println("Invoke");
-    if (setup == null) {
-      setup = new AccountSetup(this, getContext());
+    if (uri.equals("setup")) {
+      if (setup == null) {
+        setup = new AccountSetup(this, getContext());
+        setup.pack();
+        setup.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+      }
+      setup.setVisible(true);
+      setup.toFront();
+      setup.requestFocus();
+      AwtUtil.centerWindow(setup);
     }
-    if (frame == null) {
-      frame = new JFrame(getName());
-      frame.add(setup);
-      frame.pack();
-      frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-      frame.setVisible(true);
-    } else {
-      frame.setVisible(true);
-      frame.toFront();
-      frame.requestFocus();
-    }
-
-    AwtUtil.centerWindow(frame);
   }
 
   @Override
   public void cleanup() {
-    System.err.println("Cleanup");
-    if (frame != null) {
-      frame.dispose();
+    if (setup != null) {
+      setup.dispose();
     }
 
-    frame = null;
     setup = null;
   }
 }
