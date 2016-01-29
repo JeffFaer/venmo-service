@@ -1,10 +1,8 @@
 package name.falgout.jeffrey.moneydance.venmoservice;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JPanel;
@@ -22,15 +20,6 @@ import name.falgout.jeffrey.moneydance.venmoservice.rest.URIBrowser;
 
 public class AccountSetup extends JPanel {
   private static final long serialVersionUID = -3239889646842222229L;
-  private static final URI VENMO_TOKEN_URI;
-
-  static {
-    try {
-      VENMO_TOKEN_URI = new URI("https://venmo.com/account/settings/developer");
-    } catch (URISyntaxException e) {
-      throw new Error(e);
-    }
-  }
 
   private final URIBrowser browser;
   private final Auth auth;
@@ -38,7 +27,6 @@ public class AccountSetup extends JPanel {
   private final JComboBox<Account> targetAccount;
 
   private final JTextField token;
-  private final JButton tokenHelp;
   private final JButton tokenLaunch;
 
   public AccountSetup(FeatureModule feature, FeatureModuleContext context) {
@@ -51,12 +39,10 @@ public class AccountSetup extends JPanel {
         .toArray(new Account[0]));
 
     token = new JTextField();
-    tokenHelp = new JButton("?");
-    tokenLaunch = new JButton("V");
+    tokenLaunch = new JButton(new ImageIcon(feature.getIconImage()));
 
     Box tokenBox = new Box(BoxLayout.X_AXIS);
     tokenBox.add(token);
-    tokenBox.add(tokenHelp);
     tokenBox.add(tokenLaunch);
 
     Box content = new Box(BoxLayout.Y_AXIS);
@@ -64,22 +50,11 @@ public class AccountSetup extends JPanel {
     content.add(tokenBox);
 
     add(content);
-
-    tokenHelp.addActionListener(ae -> {
-      try {
-        browser.browse(VENMO_TOKEN_URI);
-      } catch (Throwable e) {
-        if (e instanceof Error) {
-          throw (Error) e;
-        } else if (e instanceof RuntimeException) {
-          throw (RuntimeException) e;
-        } else {
-          throw new RuntimeException(e);
-        }
-      }
-    });
     tokenLaunch.addActionListener(ae -> {
-      auth.authorize().thenAcceptAsync(token::setText, SwingUtilities::invokeLater);
+      auth.authorize().thenAcceptAsync(token -> {
+        this.token.setText(token);
+        this.token.setCaretPosition(0);
+      } , SwingUtilities::invokeLater);
     });
   }
 }
