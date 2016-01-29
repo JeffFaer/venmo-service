@@ -9,11 +9,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import javax.ws.rs.core.UriBuilder;
-
+import org.apache.http.client.utils.URIBuilder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,7 +25,7 @@ public class AuthTest {
 
   @Before
   public void before() {
-    auth = new Auth("http://localhost:12345");
+    auth = new Auth(URI.create("http://localhost:12345"));
   }
 
   @After
@@ -66,13 +66,13 @@ public class AuthTest {
   }
 
   @Test
-  public void capturingAccessToken()
-    throws MalformedURLException, IOException, InterruptedException, ExecutionException {
+  public void capturingAccessToken() throws MalformedURLException, IOException,
+    InterruptedException, ExecutionException, URISyntaxException {
     CompletableFuture<String> token = auth.captureAuthorization();
-    URI auth = UriBuilder.fromUri("http://localhost")
-        .host(Auth.REDIRECT_ADDRESS.getHostName())
-        .port(Auth.REDIRECT_ADDRESS.getPort())
-        .queryParam(VenmoClient.ACCESS_TOKEN, "foo")
+    URI auth = new URIBuilder("http://localhost").setHost(Auth.REDIRECT_ADDRESS.getHostName())
+        .setPort(Auth.REDIRECT_ADDRESS.getPort())
+        .addParameter(VenmoClient.ACCESS_TOKEN, "foo")
+        .setPath("/")
         .build();
 
     checkAuthResponse(auth.toURL().openStream());
@@ -92,13 +92,12 @@ public class AuthTest {
   }
 
   @Test
-  public void capturingAccessTokenError()
-    throws MalformedURLException, IOException, InterruptedException, ExecutionException {
+  public void capturingAccessTokenError() throws MalformedURLException, IOException,
+    InterruptedException, ExecutionException, URISyntaxException {
     CompletableFuture<String> token = auth.captureAuthorization();
-    URI auth = UriBuilder.fromUri("http://localhost")
-        .host(Auth.REDIRECT_ADDRESS.getHostName())
-        .port(Auth.REDIRECT_ADDRESS.getPort())
-        .queryParam(VenmoClient.ERROR, "ruh roh")
+    URI auth = new URIBuilder("http://localhost").setHost(Auth.REDIRECT_ADDRESS.getHostName())
+        .setPort(Auth.REDIRECT_ADDRESS.getPort())
+        .addParameter(VenmoClient.ERROR, "ruh roh")
         .build();
 
     checkAuthResponse(auth.toURL().openStream());

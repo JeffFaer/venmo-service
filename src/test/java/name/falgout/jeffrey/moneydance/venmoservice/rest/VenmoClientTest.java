@@ -22,13 +22,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import javax.ws.rs.core.MultivaluedMap;
-
-import org.glassfish.jersey.uri.UriComponent;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URIBuilder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -56,11 +56,13 @@ public class VenmoClientTest {
   @Captor ArgumentCaptor<HttpExchange> exchangeCaptor;
 
   @Before
-  public void before() throws IOException {
+  public void before() throws IOException, URISyntaxException {
     server = HttpServer.create(localAddress, -1);
     server.start();
 
-    client = new VenmoClient("http://" + localAddress.getHostName() + ":" + localAddress.getPort());
+    client = new VenmoClient(new URIBuilder("http://localhost").setHost(localAddress.getHostName())
+        .setPort(localAddress.getPort())
+        .build());
     token = CompletableFuture.completedFuture("foo");
   }
 
@@ -103,13 +105,20 @@ public class VenmoClientTest {
   }
 
   private void checkToken(URI uri) throws InterruptedException, ExecutionException {
-    checkToken(UriComponent.decodeQuery(uri, true));
+    checkToken(new URIBuilder(uri).getQueryParams());
   }
 
-  private void checkToken(MultivaluedMap<String, String> query)
+  private void checkToken(List<NameValuePair> query)
     throws InterruptedException, ExecutionException {
-    assertTrue(query.containsKey(VenmoClient.ACCESS_TOKEN));
-    assertEquals(token.get(), query.getFirst(VenmoClient.ACCESS_TOKEN));
+    assertQuery(query, VenmoClient.ACCESS_TOKEN, token.get());
+
+  }
+
+  private void assertQuery(List<NameValuePair> query, String name, String value) {
+    Optional<NameValuePair> p =
+        query.stream().filter(nvp -> nvp.getName().equals(name)).findFirst();
+    assertTrue(p.isPresent());
+    assertEquals(value, p.get().getValue());
   }
 
   @Test
@@ -153,7 +162,7 @@ public class VenmoClientTest {
   }
 
   private Future<VenmoResponse<Integer>> getPaginationInitial() {
-    return client.target(token, "").thenApply(t -> client.getData(t, Integer.class));
+    return client.target(token, "").thenCompose(t -> client.getData(t, Integer.class));
   }
 
   @Test
@@ -185,17 +194,14 @@ public class VenmoClientTest {
     // Verify that queries were correctly passed through.
     verify(prevHandler).handle(exchangeCaptor.capture());
     HttpExchange prevExchange = exchangeCaptor.getValue();
-    MultivaluedMap<String, String> query =
-        UriComponent.decodeQuery(prevExchange.getRequestURI(), true);
-    assertTrue(query.containsKey("foo"));
-    assertEquals("123", query.getFirst("foo"));
+    List<NameValuePair> query = new URIBuilder(prevExchange.getRequestURI()).getQueryParams();
+    assertQuery(query, "foo", "123");
     checkToken(query);
 
     verify(nextHandler).handle(exchangeCaptor.capture());
     HttpExchange nextExchange = exchangeCaptor.getValue();
-    query = UriComponent.decodeQuery(nextExchange.getRequestURI(), true);
-    assertTrue(query.containsKey("bar"));
-    assertEquals("456", query.getFirst("bar"));
+    query = new URIBuilder(nextExchange.getRequestURI()).getQueryParams();
+    assertQuery(query, "bar", "456");
     checkToken(query);
 
     verify(handler, times(2)).handle(exchangeCaptor.capture());
@@ -203,9 +209,8 @@ public class VenmoClientTest {
     HttpExchange fromNext = exchangeCaptor.getAllValues().get(3);
 
     checkToken(initial.getRequestURI());
-    query = UriComponent.decodeQuery(fromNext.getRequestURI(), true);
-    assertTrue(query.containsKey("from"));
-    assertEquals("next", query.getFirst("from"));
+    query = new URIBuilder(fromNext.getRequestURI()).getQueryParams();
+    assertQuery(query, "from", "next");
   }
 
   @Test

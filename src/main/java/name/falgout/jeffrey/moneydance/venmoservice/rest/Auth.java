@@ -9,18 +9,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriBuilder;
-
-import org.glassfish.jersey.uri.UriComponent;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URIBuilder;
 
 import com.sun.net.httpserver.HttpServer;
 
 public class Auth implements Closeable {
+  private static final URI VENMO_AUTH = VenmoClient.VENMO_API.resolve("oauth/authorize");
   private static final String CLIENT_ID = "3472";
   static final InetSocketAddress REDIRECT_ADDRESS = new InetSocketAddress("localhost", 54321);
 
@@ -48,21 +49,23 @@ public class Auth implements Closeable {
   }
 
   public Auth(URIBrowser browser) {
-    this("https://api.venmo.com/v1/oauth/authorize", browser);
+    this(VENMO_AUTH, browser);
   }
 
-  Auth(String baseUri) {
+  Auth(URI baseUri) {
     this(baseUri, URIBrowser.DESKTOP_BROWSER);
   }
 
-  Auth(String baseUri, URIBrowser browser) {
-    authUri =
-        UriBuilder.fromUri(baseUri)
-            .queryParam("client_id", CLIENT_ID)
-            .queryParam("scope",
-                String.join(" ", "access_profile", "access_balance", "access_payment_history"))
-            .build();
-    this.browser = browser;
+  Auth(URI baseUri, URIBrowser browser) {
+    try {
+      authUri = new URIBuilder(baseUri).setParameter("client_id", CLIENT_ID)
+          .setParameter("scope",
+              String.join(" ", "access_profile", "access_balance", "access_payment_history"))
+          .build();
+      this.browser = browser;
+    } catch (URISyntaxException e) {
+      throw new Error(e);
+    }
   }
 
   CompletableFuture<String> captureAuthorization() {
@@ -73,10 +76,21 @@ public class Auth implements Closeable {
       if (server == null) {
         server = HttpServer.create(REDIRECT_ADDRESS, -1);
         server.createContext("/", ex -> {
-          MultivaluedMap<String, String> query = UriComponent.decodeQuery(ex.getRequestURI(), true);
+          List<NameValuePair> query = new URIBuilder(ex.getRequestURI()).getQueryParams();
+          String error = null;
+          String accessToken = null;
+          for (NameValuePair pair : query) {
+            if (pair.getName().equals(ACCESS_TOKEN)) {
+              accessToken = pair.getValue();
+              break;
+            } else if (pair.getName().equals(ERROR)) {
+              error = pair.getValue();
+              break;
+            }
+          }
 
           try {
-            if (query.containsKey(ACCESS_TOKEN) || query.containsKey(ERROR)) {
+            if (error != null || accessToken != null) {
               byte[] response = getAuthResponse();
               ex.sendResponseHeaders(200, response.length);
               ex.getResponseBody().write(response);
@@ -86,10 +100,10 @@ public class Auth implements Closeable {
 
             ex.close();
           } finally {
-            if (query.containsKey(ACCESS_TOKEN)) {
-              token.complete(query.getFirst(ACCESS_TOKEN));
-            } else if (query.containsKey(ERROR)) {
-              token.completeExceptionally(new Exception(query.getFirst(ERROR)));
+            if (accessToken != null) {
+              token.complete(accessToken);
+            } else if (error != null) {
+              token.completeExceptionally(new Exception(error));
             }
           }
         });

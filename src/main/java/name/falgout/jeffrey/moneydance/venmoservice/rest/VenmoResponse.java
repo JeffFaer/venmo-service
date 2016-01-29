@@ -3,14 +3,14 @@ package name.falgout.jeffrey.moneydance.venmoservice.rest;
 import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.reflect.TypeToken;
+import com.fasterxml.jackson.databind.JavaType;
 
 public class VenmoResponse<T> {
   private final Optional<T> data;
   private final Optional<Pagination> pagination;
   private final Optional<VenmoException> exception;
 
-  private TypeToken<T> dataType;
+  private JavaType dataType;
 
   VenmoResponse(@JsonProperty("data") T data, @JsonProperty("pagination") Pagination pagination,
       @JsonProperty("error") VenmoException error) {
@@ -39,11 +39,11 @@ public class VenmoResponse<T> {
     return exception;
   }
 
-  TypeToken<T> getDataType() {
+  JavaType getDataType() {
     return dataType;
   }
 
-  void setDataType(TypeToken<T> dataType) {
+  void setDataType(JavaType dataType) {
     this.dataType = dataType;
   }
 

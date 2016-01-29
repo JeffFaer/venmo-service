@@ -1,6 +1,8 @@
 package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -13,18 +15,14 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.MultivaluedMap;
+import org.apache.http.client.fluent.Request;
+import org.apache.http.client.utils.URIBuilder;
 
-import org.glassfish.jersey.uri.UriComponent;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.google.common.reflect.TypeParameter;
-import com.google.common.reflect.TypeToken;
-
-import name.falgout.jeffrey.moneydance.venmoservice.jersey.VenmoObjectMapperProvider;
+import name.falgout.jeffrey.moneydance.venmoservice.jackson.VenmoModule;
 
 public class VenmoClient {
   private class PageIteratorImpl<T> implements PageIterator<T> {
@@ -87,43 +85,59 @@ public class VenmoClient {
     }
   }
 
+  static final URI VENMO_API = URI.create("https://api.venmo.com/v1/");
   static final String ACCESS_TOKEN = "access_token";
   static final String ERROR = "error";
 
-  private final Client client;
-  private final WebTarget api;
+  private final URI apiTarget;
+  private final ObjectMapper mapper;
 
   public VenmoClient() {
-    this("https://api.venmo.com/v1");
+    this(VENMO_API);
   }
 
-  VenmoClient(String baseUri) {
-    client = ClientBuilder.newBuilder().register(VenmoObjectMapperProvider.class).build();
-    api = client.target(baseUri);
+  VenmoClient(URI apiTarget) {
+    this.apiTarget = apiTarget;
+    mapper = new ObjectMapper();
+    mapper.registerModule(new VenmoModule());
   }
 
-  CompletableFuture<WebTarget> target(CompletionStage<String> authToken, String path) {
-    return authToken.thenApply(token -> api.path(path).queryParam(ACCESS_TOKEN, token))
+  CompletableFuture<URIBuilder> target(CompletionStage<String> authToken, String path) {
+    return authToken
+        .thenApply(
+            token -> new URIBuilder(apiTarget.resolve(path)).addParameter(ACCESS_TOKEN, token))
         .toCompletableFuture();
   }
 
-  <T> VenmoResponse<T> getData(WebTarget target, Class<T> dataType) {
-    return getData(target, TypeToken.of(dataType));
+  <T> CompletableFuture<VenmoResponse<T>> getData(URIBuilder target, Class<T> dataType) {
+    return getData(target, mapper.constructType(dataType));
   }
 
-  <T> VenmoResponse<T> getData(WebTarget target, TypeToken<T> dataType) {
-    TypeToken<VenmoResponse<T>> type = new TypeToken<VenmoResponse<T>>() {
-      private static final long serialVersionUID = -4655053155717345610L;
-    }.where(new TypeParameter<T>() {}, dataType);
+  <T> CompletableFuture<VenmoResponse<T>> getData(URIBuilder target, TypeReference<T> dataType) {
+    return getData(target, mapper.constructType(dataType.getType()));
+  }
 
-    GenericType<VenmoResponse<T>> responseType = new GenericType<>(type.getType());
-    VenmoResponse<T> response = target.request().get(responseType);
-    response.setDataType(dataType);
+  private <T> CompletableFuture<VenmoResponse<T>> getData(URIBuilder target, JavaType dataType) {
+    JavaType responseType =
+        mapper.getTypeFactory().constructParametricType(VenmoResponse.class, dataType);
+
+    CompletableFuture<VenmoResponse<T>> response = new CompletableFuture<>();
+    try {
+      response.complete(Request.Get(target.build()).execute().handleResponse(resp -> {
+        VenmoResponse<T> venmoResponse =
+            mapper.readerFor(responseType).readValue(resp.getEntity().getContent());
+        venmoResponse.setDataType(dataType);
+        return venmoResponse;
+      }));
+    } catch (IOException | URISyntaxException e) {
+      response.completeExceptionally(e);
+    }
     return response;
+
   }
 
   public Future<VenmoResponse<Me>> getMe(CompletionStage<String> authToken) {
-    return target(authToken, "me").thenApply(t -> getData(t, Me.class));
+    return target(authToken, "/me").thenCompose(t -> getData(t, Me.class));
   }
 
   public Future<VenmoResponse<List<Payment>>> getPaymentsAfter(CompletionStage<String> authToken,
@@ -145,49 +159,47 @@ public class VenmoClient {
   public Future<VenmoResponse<List<Payment>>> getPaymentsAfter(CompletionStage<String> authToken,
       ZonedDateTime after) {
     return payments(authToken).thenApply(t -> paymentsAfter(t, after))
-        .thenApply(this::finishPayments);
+        .thenCompose(this::finishPayments);
   }
 
   public Future<VenmoResponse<List<Payment>>> getPaymentsBefore(CompletionStage<String> authToken,
       ZonedDateTime before) {
     return payments(authToken).thenApply(t -> paymentsBefore(t, before))
-        .thenApply(this::finishPayments);
+        .thenCompose(this::finishPayments);
   }
 
   public Future<VenmoResponse<List<Payment>>> getPaymentsBetween(CompletionStage<String> authToken,
       ZonedDateTime after, ZonedDateTime before) {
     return payments(authToken).thenApply(t -> paymentsAfter(t, after))
         .thenApply(t -> paymentsBefore(t, before))
-        .thenApply(this::finishPayments);
+        .thenCompose(this::finishPayments);
   }
 
   public Future<VenmoResponse<List<Payment>>> getPayments(CompletionStage<String> authToken) {
-    return payments(authToken).thenApply(this::finishPayments);
+    return payments(authToken).thenCompose(this::finishPayments);
   }
 
-  private CompletableFuture<WebTarget> payments(CompletionStage<String> authToken) {
-    return target(authToken, "payments");
+  private CompletableFuture<URIBuilder> payments(CompletionStage<String> authToken) {
+    return target(authToken, "/payments");
   }
 
   private LocalDateTime toVenmoUTC(ZonedDateTime dateTime) {
     return dateTime.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime().withNano(0);
   }
 
-  private WebTarget paymentsBefore(WebTarget target, ZonedDateTime before) {
-    return target.queryParam("before",
+  private URIBuilder paymentsBefore(URIBuilder target, ZonedDateTime before) {
+    return target.addParameter("before",
         toVenmoUTC(before).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
   }
 
-  private WebTarget paymentsAfter(WebTarget target, ZonedDateTime after) {
-    return target.queryParam("after",
+  private URIBuilder paymentsAfter(URIBuilder target, ZonedDateTime after) {
+    return target.addParameter("after",
         toVenmoUTC(after).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
 
   }
 
-  private VenmoResponse<List<Payment>> finishPayments(WebTarget target) {
-    return getData(target, new TypeToken<List<Payment>>() {
-      private static final long serialVersionUID = -265257930840525648L;
-    });
+  private CompletableFuture<VenmoResponse<List<Payment>>> finishPayments(URIBuilder target) {
+    return getData(target, new TypeReference<List<Payment>>() {});
   }
 
   public <T> PageIterator<T> iterator(CompletionStage<String> authToken, VenmoResponse<T> next) {
@@ -207,7 +219,7 @@ public class VenmoClient {
     }
 
     return targetRelative(authToken, response.getPagination().flatMap(Pagination::getNext).get())
-        .thenApply(t -> getData(t, response.getDataType()));
+        .thenCompose(t -> getData(t, response.getDataType()));
   }
 
   public <T> Future<VenmoResponse<T>> getPrevious(CompletionStage<String> authToken,
@@ -224,23 +236,17 @@ public class VenmoClient {
 
     return targetRelative(authToken,
         response.getPagination().flatMap(Pagination::getPrevious).get())
-            .thenApply(t -> getData(t, response.getDataType()));
+            .thenCompose(t -> getData(t, response.getDataType()));
   }
 
-  private CompletableFuture<WebTarget> targetRelative(CompletionStage<String> authToken, URI uri) {
-    URI relative = api.getUri().relativize(uri);
+  private CompletableFuture<URIBuilder> targetRelative(CompletionStage<String> authToken, URI uri) {
+    URI relative = apiTarget.relativize(uri);
     if (relative.isAbsolute()) {
       // We couldn't relativize the URIs. We won't be able to access it with our (WebTarget api).
       throw new IllegalArgumentException("Could not relativize " + uri);
     }
 
-    return target(authToken, relative.getPath()).thenApply(t -> {
-      MultivaluedMap<String, String> query = UriComponent.decodeQuery(uri, true);
-      for (String key : query.keySet()) {
-        t = t.queryParam(key, query.get(key).toArray());
-      }
-
-      return t;
-    });
+    return target(authToken, "/" + relative.getPath())
+        .thenApply(t -> t.addParameters(new URIBuilder(uri).getQueryParams()));
   }
 }

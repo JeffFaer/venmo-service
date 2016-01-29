@@ -7,13 +7,11 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import javax.swing.JFrame;
-import javax.ws.rs.ext.RuntimeDelegate;
 
 import com.moneydance.apps.md.controller.FeatureModule;
 import com.moneydance.awt.AwtUtil;
 
 import name.falgout.jeffrey.moneydance.venmoservice.AccountSetup;
-import name.falgout.jeffrey.moneydance.venmoservice.jersey.MoneydanceRuntimeDelegate;
 
 public class Main extends FeatureModule {
   public static byte[] getResource(InputStream in) throws IOException {
@@ -48,8 +46,6 @@ public class Main extends FeatureModule {
 
   @Override
   public void init() {
-    RuntimeDelegate.setInstance(new MoneydanceRuntimeDelegate());
-
     getContext().registerFeature(this, "setup", null, "Setup Venmo Account");
   }
 
