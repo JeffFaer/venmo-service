@@ -2,7 +2,7 @@
   "vendor" = "Jeffrey Falgout"
   "module_build" = "1"
   "minbuild" = "1000"
-  "vendor.url" = "https://github.com/JeffreyFalgout/venmo-service"
+  "vendor.url" = "${project.url}"
   "module_name" = "Venmo Service"
   "module_desc" = "<html><body><title>Venmo Service</title><p>Imports transactions from Venmo.</p></body></html>"
   "desc" = "Imports transactions from Venmo."
