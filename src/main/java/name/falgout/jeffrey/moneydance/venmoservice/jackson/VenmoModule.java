@@ -21,6 +21,7 @@ public class VenmoModule extends SimpleModule {
   private static final long serialVersionUID = 2046605587084383357L;
 
   public VenmoModule() {
+    // Parse UTC LocalDateTimes to ZonedDateTime.
     addDeserializer(ZonedDateTime.class, new JsonDeserializer<ZonedDateTime>() {
       @Override
       public ZonedDateTime deserialize(JsonParser p, DeserializationContext ctxt)
@@ -31,6 +32,8 @@ public class VenmoModule extends SimpleModule {
             .withZoneSameInstant(ZoneId.systemDefault());
       }
     });
+
+    // Parse lowercase strings as UPPERCASE enums.
     setDeserializerModifier(new BeanDeserializerModifier() {
       @SuppressWarnings("rawtypes")
       @Override
@@ -47,6 +50,5 @@ public class VenmoModule extends SimpleModule {
         };
       }
     });
-
   }
 }
