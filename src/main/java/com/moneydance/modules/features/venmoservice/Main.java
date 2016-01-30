@@ -72,4 +72,9 @@ public class Main extends FeatureModule {
 
     setup = null;
   }
+
+  @Override
+  public void unload() {
+    cleanup();
+  }
 }

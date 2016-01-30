@@ -9,12 +9,13 @@ import java.time.format.DateTimeFormatter;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-
-import name.falgout.jeffrey.moneydance.venmoservice.rest.Payment;
-import name.falgout.jeffrey.moneydance.venmoservice.rest.Payment.Status;
 
 public class VenmoModule extends SimpleModule {
   private static final long serialVersionUID = 2046605587084383357L;
@@ -30,13 +31,22 @@ public class VenmoModule extends SimpleModule {
             .withZoneSameInstant(ZoneId.systemDefault());
       }
     });
-
-    addDeserializer(Payment.Status.class, new JsonDeserializer<Payment.Status>() {
+    setDeserializerModifier(new BeanDeserializerModifier() {
+      @SuppressWarnings("rawtypes")
       @Override
-      public Status deserialize(JsonParser p, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException {
-        return Payment.Status.valueOf(p.getValueAsString().toUpperCase());
+      public JsonDeserializer<?> modifyEnumDeserializer(DeserializationConfig config, JavaType type,
+          BeanDescription beanDesc, JsonDeserializer<?> deserializer) {
+        return new JsonDeserializer<Enum>() {
+          @SuppressWarnings("unchecked")
+          @Override
+          public Enum deserialize(JsonParser p, DeserializationContext ctxt)
+            throws IOException, JsonProcessingException {
+            return Enum.valueOf((Class<? extends Enum>) type.getRawClass(),
+                p.getValueAsString().toUpperCase());
+          }
+        };
       }
     });
+
   }
 }

@@ -103,10 +103,17 @@ public class VenmoClient {
   }
 
   CompletableFuture<URIBuilder> target(CompletionStage<String> authToken, String path) {
-    return authToken
-        .thenApply(
-            token -> new URIBuilder(apiTarget.resolve(path)).addParameter(ACCESS_TOKEN, token))
-        .toCompletableFuture();
+    return authToken.thenApply(token -> {
+      URIBuilder b = new URIBuilder(apiTarget);
+      String oldPath = b.getPath();
+      String newPath;
+      if (oldPath.endsWith("/") || path.startsWith("/")) {
+        newPath = oldPath + path;
+      } else {
+        newPath = oldPath + "/" + path;
+      }
+      return b.addParameter(ACCESS_TOKEN, token).setPath(newPath);
+    }).toCompletableFuture();
   }
 
   <T> CompletableFuture<VenmoResponse<T>> getData(URIBuilder target, Class<T> dataType) {
@@ -123,6 +130,7 @@ public class VenmoClient {
 
     CompletableFuture<VenmoResponse<T>> response = new CompletableFuture<>();
     try {
+      System.err.println(target.build());
       response.complete(Request.Get(target.build()).execute().handleResponse(resp -> {
         VenmoResponse<T> venmoResponse =
             mapper.readerFor(responseType).readValue(resp.getEntity().getContent());
@@ -137,7 +145,7 @@ public class VenmoClient {
   }
 
   public Future<VenmoResponse<Me>> getMe(CompletionStage<String> authToken) {
-    return target(authToken, "/me").thenCompose(t -> getData(t, Me.class));
+    return target(authToken, "me").thenCompose(t -> getData(t, Me.class));
   }
 
   public Future<VenmoResponse<List<Payment>>> getPaymentsAfter(CompletionStage<String> authToken,
@@ -180,7 +188,7 @@ public class VenmoClient {
   }
 
   private CompletableFuture<URIBuilder> payments(CompletionStage<String> authToken) {
-    return target(authToken, "/payments");
+    return target(authToken, "payments");
   }
 
   private LocalDateTime toVenmoUTC(ZonedDateTime dateTime) {
@@ -246,7 +254,7 @@ public class VenmoClient {
       throw new IllegalArgumentException("Could not relativize " + uri);
     }
 
-    return target(authToken, "/" + relative.getPath())
+    return target(authToken, relative.getPath())
         .thenApply(t -> t.addParameters(new URIBuilder(uri).getQueryParams()));
   }
 }

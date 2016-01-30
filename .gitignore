@@ -24,4 +24,5 @@ dist/
 priv_key
 
 # Maven
+dependency-reduced-pom.xml
 target/

@@ -26,32 +26,43 @@ public class Payment {
     SETTLED, PENDING, CANCELLED, FAILED, EXPIRED;
   }
 
+  public enum Action {
+    PAY, CHARGE;
+  }
+
   private final Status status;
+  private final Action action;
   private final Target target;
   private final User actor;
   private final BigDecimal amount;
   private final ZonedDateTime dateCreated;
-  private final ZonedDateTime dateCompleted;
+  private final Optional<ZonedDateTime> dateCompleted;
   private final String note;
   private final String id;
 
-  Payment(@JsonProperty("status") Status status, @JsonProperty("target") Target target,
-      @JsonProperty("actor") User actor, @JsonProperty("amount") BigDecimal amount,
+  Payment(@JsonProperty("status") Status status, @JsonProperty("action") Action action,
+      @JsonProperty("target") Target target, @JsonProperty("actor") User actor,
+      @JsonProperty("amount") BigDecimal amount,
       @JsonProperty("date_created") ZonedDateTime dateCreated,
       @JsonProperty("date_completed") ZonedDateTime dateCompleted,
       @JsonProperty("note") String note, @JsonProperty("id") String id) {
     this.status = status;
+    this.action = action;
     this.target = target;
     this.actor = actor;
     this.amount = amount;
     this.dateCreated = dateCreated;
-    this.dateCompleted = dateCompleted;
+    this.dateCompleted = Optional.ofNullable(dateCompleted);
     this.note = note;
     this.id = id;
   }
 
   public Status getStatus() {
     return status;
+  }
+
+  public Action getAction() {
+    return action;
   }
 
   public BigDecimal getAmount() {
@@ -62,7 +73,7 @@ public class Payment {
     return dateCreated;
   }
 
-  public ZonedDateTime getDateCompleted() {
+  public Optional<ZonedDateTime> getDateCompleted() {
     return dateCompleted;
   }
 

@@ -4,17 +4,13 @@ import java.awt.Dimension;
 import java.awt.event.ItemEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -31,19 +27,15 @@ import javax.swing.SwingUtilities;
 import com.infinitekind.moneydance.model.Account;
 import com.infinitekind.moneydance.model.AccountUtil;
 import com.infinitekind.moneydance.model.AcctFilter;
-import com.infinitekind.moneydance.model.OnlineTxn;
-import com.infinitekind.moneydance.model.OnlineTxnList;
 import com.moneydance.apps.md.controller.FeatureModule;
 import com.moneydance.apps.md.controller.FeatureModuleContext;
+import com.moneydance.apps.md.controller.Main;
+import com.moneydance.apps.md.view.gui.MoneydanceGUI;
+import com.moneydance.apps.md.view.gui.OnlineManager;
 
 import name.falgout.jeffrey.moneydance.venmoservice.rest.Auth;
-import name.falgout.jeffrey.moneydance.venmoservice.rest.Me;
-import name.falgout.jeffrey.moneydance.venmoservice.rest.PageIterator;
-import name.falgout.jeffrey.moneydance.venmoservice.rest.Payment;
 import name.falgout.jeffrey.moneydance.venmoservice.rest.URIBrowser;
 import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient;
-import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoException;
-import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoResponse;
 
 public class AccountSetup extends JFrame {
   private static final long serialVersionUID = -3239889646842222229L;
@@ -143,7 +135,16 @@ public class AccountSetup extends JFrame {
     ok.addActionListener(ae -> {
       Optional<String> token = getToken();
       if (token.isPresent()) {
-        downloadTransactions(getTargetAccount(), token.get());
+        Account target = getTargetAccount();
+
+        Main main = (Main) context;
+        MoneydanceGUI gui = (MoneydanceGUI) main.getUI();
+        gui.setStatus("Downloading Venmo transactions to account " + target, -1);
+
+        downloadTransactions(new OnlineManager(gui), target, token.get());
+
+        state.save(context.getCurrentAccountBook().getLocalStorage());
+        dispose();
       } else {
         JOptionPane.showMessageDialog(this, "Please enter an access token.", "Error",
             JOptionPane.ERROR_MESSAGE);
@@ -189,52 +190,9 @@ public class AccountSetup extends JFrame {
         : Optional.of(token.getText());
   }
 
-  private void downloadTransactions(Account account, String token) {
-    ZonedDateTime lastFetched =
-        state.getLastFetched(account).orElseGet(() -> getCreationDate(account));
-
-    CompletionStage<String> authToken = CompletableFuture.completedFuture(token);
-
-    Future<VenmoResponse<Me>> whoAmI = client.getMe(authToken);
-    Future<VenmoResponse<List<Payment>>> firstPage =
-        client.getPaymentsAfter(authToken, lastFetched);
-    // TODO SwingWorker
-    try {
-      Me me = whoAmI.get().getData();
-      String myName = me.getName();
-
-      OnlineTxnList txns = account.getDownloadedTxns();
-
-      PageIterator<List<Payment>> itr = client.iterator(authToken, firstPage.get());
-      while (itr.hasNext()) {
-        for (Payment p : itr.next(authToken)) {
-          OnlineTxn txn = txns.newTxn();
-
-          BigDecimal amount = p.getAmount();
-          if (p.getDestinationName().filter(myName::equals).isPresent()) {
-            // We're the target of the payment.
-            amount = amount.negate();
-          }
-
-          long mdAmount = amount.multiply(new BigDecimal(100)).toBigInteger().longValue();
-
-          txn.setDateInitiated(p.getDateCreated().toInstant().toEpochMilli());
-          txn.setDatePosted(p.getDateCompleted().toInstant().toEpochMilli());
-          txn.setAmount(mdAmount);
-          txn.setMemo(p.getNote());
-          txn.setFITxnId(p.getId());
-          txn.setName(p.getSourceName());
-          p.getDestinationName().ifPresent(txn::setPayeeName);
-
-          System.out.println(txn);
-          // txns.addNewTxn(txn);
-        }
-      }
-    } catch (InterruptedException | ExecutionException | VenmoException e) {
-      e.printStackTrace();
-    }
-
+  private void downloadTransactions(OnlineManager manager, Account account, String token) {
     state.setLastFetched(account, ZonedDateTime.now());
+    new TransactionImporter(client, token, getCreationDate(account), manager, account).execute();
   }
 
   private ZonedDateTime getCreationDate(Account account) {

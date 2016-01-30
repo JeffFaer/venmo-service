@@ -25,10 +25,10 @@
         </dependency>
         <dependency>
             <groupId>com.moneydance</groupId>
-            <artifactId>moneydance-dev</artifactId>
+            <artifactId>moneydance-full</artifactId>
             <version>4.0</version>
             <scope>system</scope>
-            <systemPath>${moneydance.classpath}/moneydance-dev.jar</systemPath>
+            <systemPath>${moneydance.classpath}/moneydance-full.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -62,20 +62,22 @@
     <build>
         <plugins>
             <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                    <finalName>${project.artifactId}</finalName>
-                    <appendAssemblyId>false</appendAssemblyId>
-                </configuration>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.4.3</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache</pattern>
+                                    <shadedPattern>shaded.org.apache</shadedPattern>
+                                </relocation>
+                            </relocations>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -100,7 +102,7 @@
                                     <arg value="${privkeyid}" />
                                     <arg value="${project.artifactId}" />
                                     <arg
-                                        line="${project.build.directory}/${project.artifactId}.jar" />
+                                        line="${project.build.directory}/${project.build.finalName}.jar" />
                                 </java>
                                 <move
                                     file="${basedir}/s-${project.artifactId}.mxt"
