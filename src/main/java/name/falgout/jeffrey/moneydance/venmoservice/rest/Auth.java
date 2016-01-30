@@ -25,8 +25,20 @@ public class Auth implements Closeable {
   private static final String CLIENT_ID = "3472";
   static final InetSocketAddress REDIRECT_ADDRESS = new InetSocketAddress("localhost", 54321);
 
-  static byte[] getAuthResponse() throws IOException {
-    InputStream in = Auth.class.getResourceAsStream("auth_response.html");
+  static byte[] getAuthSuccess() throws IOException {
+    InputStream in = Auth.class.getResourceAsStream("auth_success.html");
+    ByteArrayOutputStream sink = new ByteArrayOutputStream();
+    byte[] buf = new byte[1024];
+    int numRead;
+    while ((numRead = in.read(buf)) > 0) {
+      sink.write(buf, 0, numRead);
+    }
+
+    return sink.toByteArray();
+  }
+
+  static byte[] getAuthError() throws IOException {
+    InputStream in = Auth.class.getResourceAsStream("auth_failure.html");
     ByteArrayOutputStream sink = new ByteArrayOutputStream();
     byte[] buf = new byte[1024];
     int numRead;
@@ -90,8 +102,8 @@ public class Auth implements Closeable {
           }
 
           try {
-            if (error != null || accessToken != null) {
-              byte[] response = getAuthResponse();
+            if (accessToken != null || error != null) {
+              byte[] response = accessToken != null ? getAuthSuccess() : getAuthError();
               ex.sendResponseHeaders(200, response.length);
               ex.getResponseBody().write(response);
             } else {

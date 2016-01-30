@@ -130,7 +130,6 @@ public class VenmoClient {
 
     CompletableFuture<VenmoResponse<T>> response = new CompletableFuture<>();
     try {
-      System.err.println(target.build());
       response.complete(Request.Get(target.build()).execute().handleResponse(resp -> {
         VenmoResponse<T> venmoResponse =
             mapper.readerFor(responseType).readValue(resp.getEntity().getContent());

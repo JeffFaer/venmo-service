@@ -75,11 +75,11 @@ public class AuthTest {
         .setPath("/")
         .build();
 
-    checkAuthResponse(auth.toURL().openStream());
+    checkAuthResponse(Auth.getAuthSuccess(), auth.toURL().openStream());
     assertEquals("foo", token.get());
   }
 
-  private void checkAuthResponse(InputStream in) throws IOException {
+  private void checkAuthResponse(byte[] expected, InputStream in) throws IOException {
     ByteArrayOutputStream sink = new ByteArrayOutputStream();
     byte[] buf = new byte[1024];
     int numRead;
@@ -88,7 +88,7 @@ public class AuthTest {
     }
 
     byte[] allRead = sink.toByteArray();
-    assertArrayEquals(Auth.getAuthResponse(), allRead);
+    assertArrayEquals(expected, allRead);
   }
 
   @Test
@@ -100,12 +100,13 @@ public class AuthTest {
         .addParameter(VenmoClient.ERROR, "ruh roh")
         .build();
 
-    checkAuthResponse(auth.toURL().openStream());
+    InputStream response = auth.toURL().openStream();
     try {
       token.get();
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       assertEquals("ruh roh", cause.getMessage());
     }
+    checkAuthResponse(Auth.getAuthError(), response);
   }
 }

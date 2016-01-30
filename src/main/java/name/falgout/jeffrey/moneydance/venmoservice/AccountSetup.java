@@ -23,6 +23,7 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 
 import com.infinitekind.moneydance.model.Account;
 import com.infinitekind.moneydance.model.AccountUtil;
@@ -40,6 +41,8 @@ import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient;
 public class AccountSetup extends JFrame {
   private static final long serialVersionUID = -3239889646842222229L;
 
+  private final FeatureModuleContext context;
+
   private final URIBrowser browser;
   private final Auth auth;
   private final VenmoClient client;
@@ -56,6 +59,8 @@ public class AccountSetup extends JFrame {
   private final JButton cancel;
 
   public AccountSetup(FeatureModule feature, FeatureModuleContext context) {
+    this.context = context;
+
     browser = new MoneydanceBrowser(context);
     auth = new Auth(browser);
     client = new VenmoClient();
@@ -104,47 +109,22 @@ public class AccountSetup extends JFrame {
     addWindowListener(new WindowAdapter() {
       @Override
       public void windowActivated(WindowEvent e) {
-        Account selected = (Account) targetAccount.getSelectedItem();
-
-        List<Account> accounts =
-            AccountUtil.allMatchesForSearch(context.getRootAccount(), AcctFilters
-                .and(AcctFilter.ACTIVE_CATEGORY_CHOICE_FILTER, AcctFilter.NON_CATEGORY_FILTER));
-
-        targetAccountModel.removeAllElements();
-        for (Account a : accounts) {
-          targetAccountModel.addElement(a);
-        }
-
-        if (selected == null) {
-          findVenmoAccount(state, accounts).ifPresent(targetAccount::setSelectedItem);
-        } else {
-          targetAccount.setSelectedItem(selected);
-        }
-
-        pack();
+        updateAccounts();
       }
     });
-
     targetAccount.addItemListener(ie -> {
       if (ie.getStateChange() == ItemEvent.SELECTED) {
         Account a = (Account) ie.getItem();
-        state.getToken(a).ifPresent(this::setToken);
+        if (token.getText().isEmpty()) {
+          state.getToken(a).ifPresent(this::setToken);
+        }
       }
     });
     tokenLaunch.addActionListener(ae -> fetchToken());
     ok.addActionListener(ae -> {
       Optional<String> token = getToken();
       if (token.isPresent()) {
-        Account target = getTargetAccount();
-
-        Main main = (Main) context;
-        MoneydanceGUI gui = (MoneydanceGUI) main.getUI();
-        gui.setStatus("Downloading Venmo transactions to account " + target, -1);
-
-        downloadTransactions(new OnlineManager(gui), target, token.get());
-
-        state.save(context.getCurrentAccountBook().getLocalStorage());
-        dispose();
+        downloadTransactions(getTargetAccount(), token.get());
       } else {
         JOptionPane.showMessageDialog(this, "Please enter an access token.", "Error",
             JOptionPane.ERROR_MESSAGE);
@@ -155,16 +135,30 @@ public class AccountSetup extends JFrame {
     });
   }
 
-  private CompletionStage<String> fetchToken() {
-    CompletionStage<String> token = auth.authorize();
-    token.thenAcceptAsync(this::setToken, SwingUtilities::invokeLater);
-
-    return token;
+  @Override
+  public void dispose() {
+    super.dispose();
+    auth.close();
   }
 
-  private void setToken(String token) {
-    this.token.setText(token);
-    this.token.setCaretPosition(0);
+  private void updateAccounts() {
+    Account selected = (Account) targetAccount.getSelectedItem();
+
+    List<Account> accounts = AccountUtil.allMatchesForSearch(context.getRootAccount(),
+        AcctFilters.and(AcctFilter.ACTIVE_CATEGORY_CHOICE_FILTER, AcctFilter.NON_CATEGORY_FILTER));
+
+    targetAccountModel.removeAllElements();
+    for (Account a : accounts) {
+      targetAccountModel.addElement(a);
+    }
+
+    if (selected == null || !accounts.contains(selected)) {
+      findVenmoAccount(state, accounts).ifPresent(targetAccount::setSelectedItem);
+    } else {
+      targetAccount.setSelectedItem(selected);
+    }
+
+    pack();
   }
 
   private Optional<Account> findVenmoAccount(VenmoAccountState state, Iterable<Account> accounts) {
@@ -181,18 +175,59 @@ public class AccountSetup extends JFrame {
     return Optional.empty();
   }
 
+  private CompletionStage<String> fetchToken() {
+    CompletionStage<String> token = auth.authorize();
+    token.thenAcceptAsync(this::setToken, SwingUtilities::invokeLater);
+
+    return token;
+  }
+
+  private void setToken(String token) {
+    this.token.setText(token);
+    this.token.setCaretPosition(0);
+  }
+
   private Account getTargetAccount() {
     return targetAccount.getItemAt(targetAccount.getSelectedIndex());
   }
 
   private Optional<String> getToken() {
-    return token.getText() == null || token.getText().isEmpty() ? Optional.empty()
-        : Optional.of(token.getText());
+    return token.getText().isEmpty() ? Optional.empty() : Optional.of(token.getText());
   }
 
-  private void downloadTransactions(OnlineManager manager, Account account, String token) {
-    state.setLastFetched(account, ZonedDateTime.now());
-    new TransactionImporter(client, token, getCreationDate(account), manager, account).execute();
+  private void downloadTransactions(Account account, String token) {
+    Main main = (Main) context;
+    MoneydanceGUI gui = (MoneydanceGUI) main.getUI();
+
+    Optional<String> oldToken = state.getToken(account);
+    state.setToken(account, token);
+    SwingWorker<?, ?> worker =
+        new TransactionImporter(client, token, getCreationDate(account), account);
+    worker.addPropertyChangeListener(pce -> {
+      if (pce.getPropertyName().equals("state")) {
+        if (pce.getNewValue().equals(SwingWorker.StateValue.STARTED)) {
+          gui.setStatus("Downloading Venmo transactions to account " + account, -1);
+        } else if (pce.getNewValue().equals(SwingWorker.StateValue.DONE)) {
+          gui.setStatus("", 0);
+
+          try {
+            worker.get(); // Check for an exception.
+
+            new OnlineManager(gui).processDownloadedTxns(account);
+            state.setLastFetched(account, ZonedDateTime.now());
+            state.save(context.getCurrentAccountBook().getLocalStorage());
+          } catch (Exception e) {
+            oldToken.ifPresent(t -> state.setToken(account, t));
+
+            gui.showErrorMessage(e.getCause());
+            e.printStackTrace();
+          }
+        }
+      }
+    });
+    worker.execute();
+
+    dispose();
   }
 
   private ZonedDateTime getCreationDate(Account account) {

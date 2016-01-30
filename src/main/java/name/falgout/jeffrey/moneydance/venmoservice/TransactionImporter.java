@@ -5,7 +5,6 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.swing.SwingWorker;
@@ -13,7 +12,6 @@ import javax.swing.SwingWorker;
 import com.infinitekind.moneydance.model.Account;
 import com.infinitekind.moneydance.model.OnlineTxn;
 import com.infinitekind.moneydance.model.OnlineTxnList;
-import com.moneydance.apps.md.view.gui.OnlineManager;
 
 import name.falgout.jeffrey.moneydance.venmoservice.rest.Me;
 import name.falgout.jeffrey.moneydance.venmoservice.rest.PageIterator;
@@ -26,17 +24,15 @@ public class TransactionImporter extends SwingWorker<Void, Payment> {
   private final CompletionStage<String> token;
   private final ZonedDateTime after;
 
-  private final OnlineManager onlineManager;
   private final Account account;
 
   private volatile String myName;
 
   public TransactionImporter(VenmoClient client, String token, ZonedDateTime after,
-      OnlineManager onlineManager, Account account) {
+      Account account) {
     this.client = client;
     this.token = CompletableFuture.completedFuture(token);
     this.after = after;
-    this.onlineManager = onlineManager;
     this.account = account;
   }
 
@@ -95,16 +91,6 @@ public class TransactionImporter extends SwingWorker<Void, Payment> {
 
         txns.addNewTxn(otxn);
       }
-    }
-  }
-
-  @Override
-  protected void done() {
-    try {
-      get();
-      onlineManager.processDownloadedTxns(account);
-    } catch (InterruptedException | ExecutionException e) {
-      e.printStackTrace();
     }
   }
 }
