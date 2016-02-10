@@ -17,6 +17,11 @@
         <url>${project.url}/issues</url>
     </issueManagement>
 
+    <organization>
+        <name>Jeffrey Falgout</name>
+        <url>${project.url}</url>
+    </organization>
+
     <developers>
         <developer>
             <name>Jeffrey Falgout</name>
