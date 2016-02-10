@@ -68,7 +68,6 @@ public class Main extends FeatureModule {
         } catch (Exception e) {
           MoneydanceGUI gui = getUI(getContext());
           gui.showErrorMessage(e);
-          e.printStackTrace();
         }
       }
 

@@ -3,10 +3,8 @@ package name.falgout.jeffrey.moneydance.venmoservice.rest;
 import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ACCESS_TOKEN;
 import static name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient.ERROR;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -18,6 +16,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URIBuilder;
 
+import com.moneydance.modules.features.venmoservice.Main;
 import com.sun.net.httpserver.HttpServer;
 
 public class Auth implements Closeable {
@@ -26,27 +25,11 @@ public class Auth implements Closeable {
   static final InetSocketAddress REDIRECT_ADDRESS = new InetSocketAddress("localhost", 54321);
 
   static byte[] getAuthSuccess() throws IOException {
-    InputStream in = Auth.class.getResourceAsStream("auth_success.html");
-    ByteArrayOutputStream sink = new ByteArrayOutputStream();
-    byte[] buf = new byte[1024];
-    int numRead;
-    while ((numRead = in.read(buf)) > 0) {
-      sink.write(buf, 0, numRead);
-    }
-
-    return sink.toByteArray();
+    return Main.getResource(Auth.class.getResourceAsStream("auth_success.html"));
   }
 
   static byte[] getAuthError() throws IOException {
-    InputStream in = Auth.class.getResourceAsStream("auth_failure.html");
-    ByteArrayOutputStream sink = new ByteArrayOutputStream();
-    byte[] buf = new byte[1024];
-    int numRead;
-    while ((numRead = in.read(buf)) > 0) {
-      sink.write(buf, 0, numRead);
-    }
-
-    return sink.toByteArray();
+    return Main.getResource(Auth.class.getResourceAsStream("auth_failure.html"));
   }
 
   private final URI authUri;
@@ -61,16 +44,20 @@ public class Auth implements Closeable {
   }
 
   public Auth(URIBrowser browser) {
-    this(VENMO_AUTH, browser);
+    this(browser, CLIENT_ID);
+  }
+
+  public Auth(URIBrowser browser, String clientId) {
+    this(VENMO_AUTH, browser, clientId);
   }
 
   Auth(URI baseUri) {
-    this(baseUri, URIBrowser.DESKTOP_BROWSER);
+    this(baseUri, URIBrowser.DESKTOP_BROWSER, CLIENT_ID);
   }
 
-  Auth(URI baseUri, URIBrowser browser) {
+  Auth(URI baseUri, URIBrowser browser, String clientId) {
     try {
-      authUri = new URIBuilder(baseUri).setParameter("client_id", CLIENT_ID)
+      authUri = new URIBuilder(baseUri).setParameter("client_id", clientId)
           .setParameter("scope",
               String.join(" ", "access_profile", "access_balance", "access_payment_history"))
           .build();
@@ -78,6 +65,10 @@ public class Auth implements Closeable {
     } catch (URISyntaxException e) {
       throw new Error(e);
     }
+  }
+
+  public URI getAuthUri() {
+    return authUri;
   }
 
   CompletableFuture<String> captureAuthorization() {
@@ -121,7 +112,7 @@ public class Auth implements Closeable {
         });
         server.start();
       }
-    } catch (Exception e) {
+    } catch (IOException e) {
       token.completeExceptionally(e);
     } finally {
       lock.unlock();
@@ -146,7 +137,7 @@ public class Auth implements Closeable {
     CompletableFuture<String> auth = captureAuthorization();
     try {
       browser.browse(authUri);
-    } catch (Throwable t) {
+    } catch (Exception t) {
       auth.completeExceptionally(t);
     }
 

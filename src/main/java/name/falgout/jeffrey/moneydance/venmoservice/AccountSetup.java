@@ -1,9 +1,12 @@
 package name.falgout.jeffrey.moneydance.venmoservice;
 
 import java.awt.Dimension;
+import java.awt.Toolkit;
 import java.awt.event.ItemEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.IOException;
+import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -42,18 +45,30 @@ import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient;
 public class AccountSetup extends JFrame {
   private static final long serialVersionUID = -3239889646842222229L;
 
+  static Optional<ImageIcon> getDevTokenImage() {
+    try {
+      return Optional.of(new ImageIcon(Toolkit.getDefaultToolkit()
+          .createImage(Main.getResource(AccountSetup.class.getResourceAsStream("venmo.png")))));
+    } catch (IOException e) {
+      e.printStackTrace();
+      return Optional.empty();
+    }
+  }
+
   private final VenmoAccountState state;
   private final FeatureModuleContext context;
 
-  private final URIBrowser browser;
   private final Auth auth;
   private final VenmoClient client;
+
+  private final URI devAuth;
 
   private final DefaultComboBoxModel<Account> targetAccountModel;
   private final JComboBox<Account> targetAccount;
 
   private final JTextField token;
   private final JButton tokenLaunch;
+  private final JButton devToken;
 
   private final JButton ok;
   private final JButton cancel;
@@ -63,9 +78,13 @@ public class AccountSetup extends JFrame {
     this.state = state;
     this.context = context;
 
-    browser = new MoneydanceBrowser(context);
+    URIBrowser browser = new MoneydanceBrowser(context);
     auth = new Auth(browser);
     client = new VenmoClient();
+
+    Auth auth = new Auth(browser, "2899");
+    devAuth = auth.getAuthUri();
+    auth.close();
 
     targetAccountModel = new DefaultComboBoxModel<>();
     targetAccount = new JComboBox<>();
@@ -78,6 +97,7 @@ public class AccountSetup extends JFrame {
     token.setPreferredSize(new Dimension(200, 20));
     tokenLaunch = new JButton(new ImageIcon(feature.getIconImage()));
     tokenLaunch.setToolTipText("Open a token request in your Web browser.");
+    devToken = getDevTokenImage().map(JButton::new).orElseGet(() -> new JButton("?"));
 
     JLabel tokenLabel = new JLabel("Access Token:");
     tokenLabel.setLabelFor(token);
@@ -93,6 +113,7 @@ public class AccountSetup extends JFrame {
     tokenBox.add(tokenLabel);
     tokenBox.add(token);
     tokenBox.add(tokenLaunch);
+    tokenBox.add(devToken);
 
     Box actions = new Box(BoxLayout.X_AXIS);
     actions.add(ok);
@@ -120,6 +141,13 @@ public class AccountSetup extends JFrame {
       }
     });
     tokenLaunch.addActionListener(ae -> fetchToken());
+    devToken.addActionListener(ae -> {
+      try {
+        browser.browse(devAuth);
+      } catch (Exception e) {
+        Main.getUI(context).showErrorMessage(e);
+      }
+    });
     ok.addActionListener(ae -> {
       Optional<String> token = getToken();
       if (token.isPresent()) {
@@ -176,9 +204,14 @@ public class AccountSetup extends JFrame {
 
   private CompletionStage<String> fetchToken() {
     CompletionStage<String> token = auth.authorize();
-    token.thenAcceptAsync(this::setToken, SwingUtilities::invokeLater);
-
-    return token;
+    return token.whenCompleteAsync((t, ex) -> {
+      if (t != null) {
+        setToken(t);
+      }
+      if (ex != null) {
+        Main.getUI(context).showErrorMessage(ex);
+      }
+    } , SwingUtilities::invokeLater);
   }
 
   private void setToken(String token) {
