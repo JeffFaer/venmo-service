@@ -27,6 +27,11 @@ public class Main extends FeatureModule {
     return sink.toByteArray();
   }
 
+  public static MoneydanceGUI getUI(FeatureModuleContext context) {
+    com.moneydance.apps.md.controller.Main main = (com.moneydance.apps.md.controller.Main) context;
+    return (MoneydanceGUI) main.getUI();
+  }
+
   private VenmoAccountState state;
   private AccountSetup setup;
 
@@ -51,11 +56,6 @@ public class Main extends FeatureModule {
   @Override
   public void init() {
     getContext().registerFeature(this, "setup", null, "Setup Venmo Account");
-  }
-
-  public static MoneydanceGUI getUI(FeatureModuleContext context) {
-    com.moneydance.apps.md.controller.Main main = (com.moneydance.apps.md.controller.Main) context;
-    return (MoneydanceGUI) main.getUI();
   }
 
   @Override

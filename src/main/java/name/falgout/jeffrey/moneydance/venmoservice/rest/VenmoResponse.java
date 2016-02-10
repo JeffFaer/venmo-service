@@ -1,5 +1,6 @@
 package name.falgout.jeffrey.moneydance.venmoservice.rest;
 
+import java.net.URI;
 import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -10,6 +11,7 @@ public class VenmoResponse<T> {
   private final Optional<Pagination> pagination;
   private final Optional<VenmoException> exception;
 
+  private URI uri;
   private JavaType dataType;
 
   VenmoResponse(@JsonProperty("data") T data, @JsonProperty("pagination") Pagination pagination,
@@ -45,6 +47,14 @@ public class VenmoResponse<T> {
 
   void setDataType(JavaType dataType) {
     this.dataType = dataType;
+  }
+
+  URI getURI() {
+    return uri;
+  }
+
+  void setURI(URI uri) {
+    this.uri = uri;
   }
 
   @Override

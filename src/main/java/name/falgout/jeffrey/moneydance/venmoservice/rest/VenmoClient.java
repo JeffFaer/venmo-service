@@ -130,17 +130,18 @@ public class VenmoClient {
 
     CompletableFuture<VenmoResponse<T>> response = new CompletableFuture<>();
     try {
-      response.complete(Request.Get(target.build()).execute().handleResponse(resp -> {
+      URI uri = target.build();
+      response.complete(Request.Get(uri).execute().handleResponse(resp -> {
         VenmoResponse<T> venmoResponse =
             mapper.readerFor(responseType).readValue(resp.getEntity().getContent());
         venmoResponse.setDataType(dataType);
+        venmoResponse.setURI(uri);
         return venmoResponse;
       }));
     } catch (IOException | URISyntaxException e) {
       response.completeExceptionally(e);
     }
     return response;
-
   }
 
   public Future<VenmoResponse<Me>> getMe(CompletionStage<String> authToken) {

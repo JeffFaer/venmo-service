@@ -32,7 +32,7 @@ public class Auth implements Closeable {
     return Main.getResource(Auth.class.getResourceAsStream("auth_failure.html"));
   }
 
-  private final URI authUri;
+  private final URI authURI;
   private final URIBrowser browser;
 
   private final Lock lock = new ReentrantLock();
@@ -57,7 +57,7 @@ public class Auth implements Closeable {
 
   Auth(URI baseUri, URIBrowser browser, String clientId) {
     try {
-      authUri = new URIBuilder(baseUri).setParameter("client_id", clientId)
+      authURI = new URIBuilder(baseUri).setParameter("client_id", clientId)
           .setParameter("scope",
               String.join(" ", "access_profile", "access_balance", "access_payment_history"))
           .build();
@@ -67,8 +67,8 @@ public class Auth implements Closeable {
     }
   }
 
-  public URI getAuthUri() {
-    return authUri;
+  public URI getAuthURI() {
+    return authURI;
   }
 
   CompletableFuture<String> captureAuthorization() {
@@ -136,7 +136,7 @@ public class Auth implements Closeable {
   public CompletableFuture<String> authorize() {
     CompletableFuture<String> auth = captureAuthorization();
     try {
-      browser.browse(authUri);
+      browser.browse(authURI);
     } catch (Exception t) {
       auth.completeExceptionally(t);
     }

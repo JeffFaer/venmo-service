@@ -39,6 +39,7 @@ import com.moneydance.apps.md.view.gui.OnlineManager;
 import com.moneydance.modules.features.venmoservice.Main;
 
 import name.falgout.jeffrey.moneydance.venmoservice.rest.Auth;
+import name.falgout.jeffrey.moneydance.venmoservice.rest.Me;
 import name.falgout.jeffrey.moneydance.venmoservice.rest.URIBrowser;
 import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient;
 
@@ -72,6 +73,7 @@ public class AccountSetup extends JFrame {
 
   private final JButton ok;
   private final JButton cancel;
+  private final JButton clearData;
 
   public AccountSetup(VenmoAccountState state, FeatureModule feature,
       FeatureModuleContext context) {
@@ -83,7 +85,7 @@ public class AccountSetup extends JFrame {
     client = new VenmoClient();
 
     Auth auth = new Auth(browser, "2899");
-    devAuth = auth.getAuthUri();
+    devAuth = auth.getAuthURI();
     auth.close();
 
     targetAccountModel = new DefaultComboBoxModel<>();
@@ -104,6 +106,7 @@ public class AccountSetup extends JFrame {
 
     ok = new JButton("Download");
     cancel = new JButton("Cancel");
+    clearData = new JButton("Clear Data");
 
     Box accountBox = new Box(BoxLayout.X_AXIS);
     accountBox.add(accountLabel);
@@ -118,6 +121,7 @@ public class AccountSetup extends JFrame {
     Box actions = new Box(BoxLayout.X_AXIS);
     actions.add(ok);
     actions.add(cancel);
+    actions.add(clearData);
 
     Box content = new Box(BoxLayout.Y_AXIS);
     content.add(accountBox);
@@ -159,6 +163,13 @@ public class AccountSetup extends JFrame {
     });
     cancel.addActionListener(ae -> {
       dispose();
+    });
+    clearData.addActionListener(ae -> {
+      try {
+        state.removeFrom(context.getCurrentAccountBook().getLocalStorage());
+      } catch (Exception e) {
+        Main.getUI(context).showErrorMessage(e);
+      }
     });
   }
 
@@ -230,27 +241,33 @@ public class AccountSetup extends JFrame {
   private void downloadTransactions(Account account, String token) {
     MoneydanceGUI gui = Main.getUI(context);
 
-    SwingWorker<?, ?> worker =
-        new TransactionImporter(client, token, getCreationDate(account), account);
+    TransactionImporter worker = new TransactionImporter(client, token,
+        state.getLastFetched(account).orElseGet(() -> getCreationDate(account)), account);
     worker.addPropertyChangeListener(pce -> {
       if (pce.getPropertyName().equals("state")) {
         if (pce.getNewValue().equals(SwingWorker.StateValue.STARTED)) {
           gui.setStatus("Downloading Venmo transactions to account " + account, -1);
+
+          worker.getMe().thenApply(Me::getName).thenAcceptAsync(name -> {
+            gui.setStatus("Downloading " + name + "'s Venmo transactions to account " + account,
+                -1);
+          } , SwingUtilities::invokeLater);
         } else if (pce.getNewValue().equals(SwingWorker.StateValue.DONE)) {
           gui.setStatus("", 0);
 
           try {
-            worker.get(); // Check for an exception.
+            ZonedDateTime fetched = worker.get(); // Check for an exception.
 
             new OnlineManager(gui).processDownloadedTxns(account);
 
             state.setToken(account, token);
-            state.setLastFetched(account, ZonedDateTime.now());
+            state.setLastFetched(account, fetched);
             state.save(context.getCurrentAccountBook().getLocalStorage());
-          } catch (Exception e) {
-            Throwable report = e instanceof ExecutionException ? e.getCause() : e;
-            gui.showErrorMessage(report);
+          } catch (ExecutionException e) {
+            gui.showErrorMessage(e.getCause());
             e.printStackTrace();
+          } catch (Exception e) {
+            gui.showErrorMessage(e);
           }
         }
       }

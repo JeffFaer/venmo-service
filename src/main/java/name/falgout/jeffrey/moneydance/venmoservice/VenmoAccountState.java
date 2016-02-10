@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -22,7 +23,7 @@ import com.moneydance.apps.md.controller.FeatureModuleContext;
 public class VenmoAccountState {
   private static class StateEntry implements Serializable {
     private static final long serialVersionUID = 2767501973800986951L;
-    private ZonedDateTime lastFetched;
+    private transient ZonedDateTime lastFetched;
     private transient String token;
 
     Optional<ZonedDateTime> getLastFetched() {
@@ -92,6 +93,11 @@ public class VenmoAccountState {
 
       for (Entry<String, StateEntry> e : accounts.entrySet()) {
         Account acct = context.getCurrentAccountBook().getAccountByUUID(e.getKey());
+        long instant = acct.getDownloadedTxns().getOFXLastTxnUpdate();
+        if (instant != 0) {
+          ZonedDateTime lastFetched = Instant.ofEpochMilli(instant).atZone(ZoneId.systemDefault());
+          e.getValue().setLastFetched(lastFetched);
+        }
         e.getValue().setToken(storage.getCachedAuthentication(getTokenKey(acct)));
         state.put(acct, e.getValue());
       }
@@ -108,6 +114,9 @@ public class VenmoAccountState {
     for (Entry<Account, StateEntry> e : state.entrySet()) {
       uuids.put(e.getKey().getUUID(), e.getValue());
 
+      e.getValue().getLastFetched().ifPresent(f -> {
+        e.getKey().getDownloadedTxns().setOFXLastTxnUpdate(f.toInstant().toEpochMilli());
+      });
       e.getValue().getToken().ifPresent(t -> {
         storage.cacheAuthentication(getTokenKey(e.getKey()), t);
       });
