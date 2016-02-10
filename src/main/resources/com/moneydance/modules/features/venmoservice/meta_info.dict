@@ -1,7 +1,7 @@
 {
   "vendor" = "Jeffrey Falgout"
-  "module_build" = "1"
-  "minbuild" = "1000"
+  "module_build" = "2"
+  "minbuild" = "1299"
   "vendor.url" = "${project.url}"
   "module_name" = "Venmo Service"
   "module_desc" = "<html><body><title>Venmo Service</title><p>Imports transactions from Venmo.</p></body></html>"
