@@ -9,9 +9,12 @@ import java.io.InputStream;
 import javax.swing.JFrame;
 
 import com.moneydance.apps.md.controller.FeatureModule;
+import com.moneydance.apps.md.controller.FeatureModuleContext;
+import com.moneydance.apps.md.view.gui.MoneydanceGUI;
 import com.moneydance.awt.AwtUtil;
 
 import name.falgout.jeffrey.moneydance.venmoservice.AccountSetup;
+import name.falgout.jeffrey.moneydance.venmoservice.VenmoAccountState;
 
 public class Main extends FeatureModule {
   public static byte[] getResource(InputStream in) throws IOException {
@@ -24,6 +27,7 @@ public class Main extends FeatureModule {
     return sink.toByteArray();
   }
 
+  private VenmoAccountState state;
   private AccountSetup setup;
 
   public Main() {}
@@ -49,11 +53,27 @@ public class Main extends FeatureModule {
     getContext().registerFeature(this, "setup", null, "Setup Venmo Account");
   }
 
+  public static MoneydanceGUI getUI(FeatureModuleContext context) {
+    com.moneydance.apps.md.controller.Main main = (com.moneydance.apps.md.controller.Main) context;
+    return (MoneydanceGUI) main.getUI();
+  }
+
   @Override
   public void invoke(String uri) {
     if (uri.equals("setup")) {
+      if (state == null) {
+        state = new VenmoAccountState(this);
+        try {
+          state.load(getContext());
+        } catch (Exception e) {
+          MoneydanceGUI gui = getUI(getContext());
+          gui.showErrorMessage(e);
+          e.printStackTrace();
+        }
+      }
+
       if (setup == null) {
-        setup = new AccountSetup(this, getContext());
+        setup = new AccountSetup(state, this, getContext());
         setup.pack();
         setup.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
       }
@@ -76,5 +96,12 @@ public class Main extends FeatureModule {
   @Override
   public void unload() {
     cleanup();
+
+    try {
+      state.removeFrom(getContext().getCurrentAccountBook().getLocalStorage());
+      state = null;
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 }

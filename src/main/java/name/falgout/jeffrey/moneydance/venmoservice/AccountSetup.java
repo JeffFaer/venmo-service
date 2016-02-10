@@ -11,6 +11,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -30,9 +31,9 @@ import com.infinitekind.moneydance.model.AccountUtil;
 import com.infinitekind.moneydance.model.AcctFilter;
 import com.moneydance.apps.md.controller.FeatureModule;
 import com.moneydance.apps.md.controller.FeatureModuleContext;
-import com.moneydance.apps.md.controller.Main;
 import com.moneydance.apps.md.view.gui.MoneydanceGUI;
 import com.moneydance.apps.md.view.gui.OnlineManager;
+import com.moneydance.modules.features.venmoservice.Main;
 
 import name.falgout.jeffrey.moneydance.venmoservice.rest.Auth;
 import name.falgout.jeffrey.moneydance.venmoservice.rest.URIBrowser;
@@ -41,13 +42,12 @@ import name.falgout.jeffrey.moneydance.venmoservice.rest.VenmoClient;
 public class AccountSetup extends JFrame {
   private static final long serialVersionUID = -3239889646842222229L;
 
+  private final VenmoAccountState state;
   private final FeatureModuleContext context;
 
   private final URIBrowser browser;
   private final Auth auth;
   private final VenmoClient client;
-
-  private final VenmoAccountState state;
 
   private final DefaultComboBoxModel<Account> targetAccountModel;
   private final JComboBox<Account> targetAccount;
@@ -58,15 +58,14 @@ public class AccountSetup extends JFrame {
   private final JButton ok;
   private final JButton cancel;
 
-  public AccountSetup(FeatureModule feature, FeatureModuleContext context) {
+  public AccountSetup(VenmoAccountState state, FeatureModule feature,
+      FeatureModuleContext context) {
+    this.state = state;
     this.context = context;
 
     browser = new MoneydanceBrowser(context);
     auth = new Auth(browser);
     client = new VenmoClient();
-
-    state = new VenmoAccountState(feature);
-    state.load(context);
 
     targetAccountModel = new DefaultComboBoxModel<>();
     targetAccount = new JComboBox<>();
@@ -196,11 +195,8 @@ public class AccountSetup extends JFrame {
   }
 
   private void downloadTransactions(Account account, String token) {
-    Main main = (Main) context;
-    MoneydanceGUI gui = (MoneydanceGUI) main.getUI();
+    MoneydanceGUI gui = Main.getUI(context);
 
-    Optional<String> oldToken = state.getToken(account);
-    state.setToken(account, token);
     SwingWorker<?, ?> worker =
         new TransactionImporter(client, token, getCreationDate(account), account);
     worker.addPropertyChangeListener(pce -> {
@@ -214,12 +210,13 @@ public class AccountSetup extends JFrame {
             worker.get(); // Check for an exception.
 
             new OnlineManager(gui).processDownloadedTxns(account);
+
+            state.setToken(account, token);
             state.setLastFetched(account, ZonedDateTime.now());
             state.save(context.getCurrentAccountBook().getLocalStorage());
           } catch (Exception e) {
-            oldToken.ifPresent(t -> state.setToken(account, t));
-
-            gui.showErrorMessage(e.getCause());
+            Throwable report = e instanceof ExecutionException ? e.getCause() : e;
+            gui.showErrorMessage(report);
             e.printStackTrace();
           }
         }

@@ -14,7 +14,7 @@ public class MoneydanceBrowser implements URIBrowser {
   }
 
   @Override
-  public void browse(URI uri) throws Throwable {
+  public void browse(URI uri) throws Exception {
     context.showURL(uri.toURL().toString());
   }
 }

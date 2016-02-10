@@ -1,14 +1,14 @@
 package name.falgout.jeffrey.moneydance.venmoservice;
 
-import static java.util.stream.Collectors.toList;
-
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -16,14 +16,14 @@ import java.util.Set;
 
 import com.infinitekind.moneydance.model.Account;
 import com.infinitekind.moneydance.model.LocalStorage;
-import com.infinitekind.tiksync.SyncRecord;
 import com.moneydance.apps.md.controller.FeatureModule;
 import com.moneydance.apps.md.controller.FeatureModuleContext;
 
 public class VenmoAccountState {
-  private static class StateEntry {
+  private static class StateEntry implements Serializable {
+    private static final long serialVersionUID = 2767501973800986951L;
     private ZonedDateTime lastFetched;
-    private String token;
+    private transient String token;
 
     Optional<ZonedDateTime> getLastFetched() {
       return Optional.ofNullable(lastFetched);
@@ -43,20 +43,20 @@ public class VenmoAccountState {
   }
 
   private static final String KEY_DELIMITER = ".";
-  private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_ZONED_DATE_TIME;
 
   private final String featureName;
-  private final String accountsKey;
-
   private final Map<Account, StateEntry> state = new LinkedHashMap<>();
 
   public VenmoAccountState(FeatureModule feature) {
     featureName = feature.getIDStr();
-    accountsKey = featureName + KEY_DELIMITER + "accounts";
   }
 
-  private String getDateKey(Account account) {
-    return featureName + KEY_DELIMITER + account.getUUID() + KEY_DELIMITER + "lastFetched";
+  private String getKey(Account account, String keyName) {
+    return String.join(KEY_DELIMITER, featureName, account.getUUID(), keyName);
+  }
+
+  private String getTokenKey(Account account) {
+    return getKey(account, "token");
   }
 
   public Set<Account> getAccounts() {
@@ -83,57 +83,41 @@ public class VenmoAccountState {
     state.computeIfAbsent(acct, k -> new StateEntry()).setLastFetched(time);
   }
 
-  public void load(FeatureModuleContext context) {
-    for (Account account : getAccounts(context)) {
-      Optional<ZonedDateTime> lastFetched = getLastFetched(context, account);
-      StateEntry e = new StateEntry();
-      lastFetched.ifPresent(e::setLastFetched);
+  public void load(FeatureModuleContext context) throws Exception {
+    LocalStorage storage = context.getCurrentAccountBook().getLocalStorage();
+    if (storage.exists(featureName)) {
+      ObjectInputStream in = new ObjectInputStream(storage.openFileForReading(featureName));
+      @SuppressWarnings("unchecked") Map<String, StateEntry> accounts =
+          (Map<String, StateEntry>) in.readObject();
 
-      state.put(account, e);
+      for (Entry<String, StateEntry> e : accounts.entrySet()) {
+        Account acct = context.getCurrentAccountBook().getAccountByUUID(e.getKey());
+        e.getValue().setToken(storage.getCachedAuthentication(getTokenKey(acct)));
+        state.put(acct, e.getValue());
+      }
     }
   }
 
-  private List<Account> getAccounts(FeatureModuleContext context) {
-    SyncRecord s = context.getCurrentAccountBook().getLocalStorage();
-    if (s.containsKey(accountsKey)) {
-      return s.getStringList(accountsKey)
-          .stream()
-          .map(context.getCurrentAccountBook()::getAccountByUUID)
-          .collect(toList());
-    } else {
-      return Collections.emptyList();
-    }
+  public void removeFrom(LocalStorage storage) throws Exception {
+    storage.clearAuthenticationCache(featureName);
+    storage.delete(featureName);
   }
 
-  private Optional<ZonedDateTime> getLastFetched(FeatureModuleContext context, Account account) {
-    String dateKey = getDateKey(account);
-    SyncRecord s = context.getCurrentAccountBook().getLocalStorage();
-    if (s.containsKey(dateKey)) {
-      return Optional.of(ZonedDateTime.parse(s.get(dateKey), FORMATTER));
-    } else {
-      return Optional.empty();
-    }
-  }
-
-  public void removeFrom(SyncRecord storage) {
-    for (Account a : state.keySet()) {
-      storage.remove(getDateKey(a));
-    }
-
-    storage.removeSubset(accountsKey);
-  }
-
-  public void save(LocalStorage storage) {
-    SyncRecord r = storage;
-    List<String> uuids = state.keySet().stream().map(Account::getUUID).collect(toList());
-    r.put(accountsKey, uuids);
-
+  public void save(LocalStorage storage) throws Exception {
+    Map<String, StateEntry> uuids = new LinkedHashMap<>(state.size());
     for (Entry<Account, StateEntry> e : state.entrySet()) {
-      e.getValue().getLastFetched().ifPresent(time -> {
-        r.put(getDateKey(e.getKey()), FORMATTER.format(time));
+      uuids.put(e.getKey().getUUID(), e.getValue());
+
+      e.getValue().getToken().ifPresent(t -> {
+        storage.cacheAuthentication(getTokenKey(e.getKey()), t);
       });
     }
 
-    storage.save();
+    ByteArrayOutputStream sink = new ByteArrayOutputStream();
+    ObjectOutputStream oos = new ObjectOutputStream(sink);
+    oos.writeObject(uuids);
+    oos.close();
+
+    storage.writeToFileAtomically(sink.toByteArray(), featureName);
   }
 }

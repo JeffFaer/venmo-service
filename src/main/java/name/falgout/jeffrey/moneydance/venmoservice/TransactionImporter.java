@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.SwingWorker;
 
@@ -26,7 +27,7 @@ public class TransactionImporter extends SwingWorker<Void, Payment> {
 
   private final Account account;
 
-  private volatile String myName;
+  private final AtomicReference<Me> me = new AtomicReference<>();
 
   public TransactionImporter(VenmoClient client, String token, ZonedDateTime after,
       Account account) {
@@ -39,11 +40,11 @@ public class TransactionImporter extends SwingWorker<Void, Payment> {
   @Override
   protected Void doInBackground() throws Exception {
     Future<VenmoResponse<Me>> whoAmI = client.getMe(token);
+    // XXX Venmo's payments?after=* doesn't work.
     Future<VenmoResponse<List<Payment>>> firstPage = client.getPayments(token);
     PageIterator<List<Payment>> itr = client.iterator(token, firstPage.get());
 
-    Me me = whoAmI.get().getData();
-    myName = me.getName();
+    me.set(whoAmI.get().getData());
 
     while (itr.hasNext()) {
       List<Payment> payments = itr.next(token);
@@ -54,6 +55,10 @@ public class TransactionImporter extends SwingWorker<Void, Payment> {
       publish(publishable);
     }
 
+    // TODO return the date of the newest transaction OR the oldest pending transaction.
+    // If Venmo's payments?after=* filters by dateCompleted then just return the date of the newest
+    // transaction.
+    // If Venmo's payments?after=* filters by dateCreated then return oldest pending transaction.
     return null;
   }
 
@@ -66,11 +71,10 @@ public class TransactionImporter extends SwingWorker<Void, Payment> {
         OnlineTxn otxn = txns.newTxn();
 
         BigDecimal amount = p.getAmount();
-        boolean areWeSource = p.getSourceName().equals(myName);
+        boolean areWeSource = p.getSourceName().equals(me.get().getName());
         if (areWeSource && p.getAction() == Payment.Action.PAY) {
           amount = amount.negate();
-        }
-        if (!areWeSource && p.getAction() == Payment.Action.CHARGE) {
+        } else if (!areWeSource && p.getAction() == Payment.Action.CHARGE) {
           amount = amount.negate();
         }
 
@@ -93,4 +97,6 @@ public class TransactionImporter extends SwingWorker<Void, Payment> {
       }
     }
   }
+
+  // TODO in done(): Update OnlineTxnList::setOnlineAvailBalance, OnlineTxnList::setOFXLastTxnUpdate
 }
